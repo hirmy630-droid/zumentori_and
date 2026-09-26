@@ -1,0 +1,1131 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <link rel="manifest" href="./manifest.json">
+  <link rel="apple-touch-icon" sizes="180x180" href="./icon-180.png">
+  <meta name="theme-color" content="#000000">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="図面材料計算">
+  <title>図面材料計算</title>
+  <style>
+    :root {
+      --bg: #000000;
+      --card-bg: #141416;
+      --panel-bg: #1c1c1e;
+      --text: #ffffff;
+      --sub-text: #8e8e93;
+      --accent-orange: #f97316;
+      --accent-blue: #0ea5e9;
+      --accent-green: #22c55e;
+      --btn-bg: #262629;
+      --btn-active: #3a3a3d;
+      --border: #27272a;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      width: 100vw;
+      overflow: hidden;
+      font-size: 15px; /* 全体+2pt拡大 */
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+
+    /* ヘッダー */
+    header {
+      flex: none;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 14px 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    header h1 {
+      font-size: 18px; /* +2pt */
+      font-weight: 700;
+      letter-spacing: 0.03em;
+    }
+    header .brand {
+      font-size: 14px; /* 最低フォントサイズ14px */
+      color: var(--sub-text);
+      font-weight: 700;
+      letter-spacing: 0.05em;
+    }
+
+    /* タブ切り替えバー（3タブ化） */
+    .tab-bar {
+      flex: none;
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 4px;
+      background-color: var(--card-bg);
+      margin: 6px 12px;
+      padding: 3px;
+      border-radius: 8px;
+    }
+    .tab-btn {
+      padding: 8px 0;
+      text-align: center;
+      font-size: 15px; /* +2pt */
+      font-weight: 600;
+      color: var(--sub-text);
+      border: none;
+      background: none;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .tab-btn.active {
+      background-color: #3f3f46;
+      color: #ffffff;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+    }
+
+    /* メインスクロールエリア */
+    main {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0 12px 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    /* 端寸ステータス表示（片張余り・芯割余り） */
+    .status-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .status-card {
+      background-color: var(--card-bg);
+      border-radius: 10px;
+      padding: 8px 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .status-card.blue {
+      border: 2px solid var(--accent-blue);
+    }
+    .status-card.green {
+      border: 2px solid var(--accent-green);
+    }
+    .status-title {
+      font-size: 14px; /* +2pt */
+      font-weight: 700;
+      line-height: 1.3;
+    }
+    .status-card.blue .status-title { color: var(--accent-blue); }
+    .status-card.green .status-title { color: var(--accent-green); }
+    .status-num {
+      font-size: 21px; /* +2pt */
+      font-weight: 800;
+      font-family: ui-monospace, SFMono-Regular, monospace;
+    }
+    .status-num span {
+      font-size: 14px; /* 最低フォントサイズ14px */
+      font-weight: 500;
+      color: var(--sub-text);
+      margin-left: 2px;
+    }
+
+    .grid-row-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+    .input-box {
+      background-color: var(--card-bg);
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      transition: border-color 0.15s ease;
+    }
+    .input-box.active {
+      border-color: var(--accent-orange) !important;
+      box-shadow: 0 0 0 1px var(--accent-orange);
+      background-color: #1f1b16;
+    }
+    .input-label {
+      font-size: 14px; /* 最低フォントサイズ14px */
+      font-weight: 600;
+      color: #a1a1aa;
+    }
+    .input-val {
+      font-size: 21px; /* +2pt */
+      font-weight: 800;
+      font-family: ui-monospace, SFMono-Regular, monospace;
+      color: #ffffff;
+    }
+
+    /* 内訳サマリーテーブル */
+    .summary-card {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 14px; /* +2pt */
+    }
+    .summary-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 5px 0;
+      border-bottom: 1px solid #27272a;
+    }
+    .summary-row:last-child {
+      border-bottom: none;
+    }
+    .sum-title {
+      color: #a1a1aa;
+      font-weight: 600;
+    }
+    .sum-val {
+      font-weight: 700;
+      font-family: ui-monospace, SFMono-Regular, monospace;
+      font-size: 16px; /* +1pt拡大 */
+    }
+
+    /* 面積タブ用専用スタイル */
+    .area-stat-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .area-stat-card {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .area-stat-title {
+      font-size: 14px; /* 最低フォントサイズ14px */
+      font-weight: 600;
+      color: #a1a1aa;
+    }
+    .area-stat-val {
+      font-size: 20px; /* +1pt */
+      font-weight: 800;
+      font-family: ui-monospace, SFMono-Regular, monospace;
+      color: #ffffff;
+    }
+    .area-stat-val span {
+      font-size: 14px; /* 最低フォントサイズ14px */
+      color: var(--sub-text);
+      margin-left: 2px;
+    }
+
+    /* 面積タブ用 全幅×最長 メインカード */
+    .area-total-card {
+      background-color: var(--card-bg);
+      border: 1px solid #3f3f46;
+      border-radius: 8px;
+      padding: 12px 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .area-total-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: #e4e4e7;
+    }
+    .area-total-val {
+      font-size: 26px;
+      font-weight: 800;
+      font-family: ui-monospace, SFMono-Regular, monospace;
+      color: #ffffff;
+    }
+    .area-total-val span {
+      font-size: 14px;
+      color: var(--sub-text);
+      margin-left: 2px;
+    }
+
+    /* 面積タブ 保存済みカード */
+    .area-hist-card {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    /* 保存データ一覧スタイル（面積データとサイズ統一） */
+    #section-history {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .history-card {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .history-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .history-title {
+      font-size: 15px; /* 面積データと同じ15px */
+      font-weight: 700;
+      color: #ffffff;
+    }
+    .history-date {
+      font-size: 14px; /* 最低フォントサイズ14px */
+      color: var(--sub-text);
+    }
+    .history-body {
+      font-size: 14px; /* 最低フォントサイズ14px */
+      color: #d4d4d8;
+      line-height: 1.4;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .history-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 4px;
+    }
+    .hist-btn {
+      padding: 5px 12px;
+      font-size: 14px; /* 最低フォントサイズ14px */
+      font-weight: 600;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: #27272a;
+      color: #fff;
+      cursor: pointer;
+    }
+    .hist-btn.load {
+      background-color: #0284c7;
+      border-color: #0284c7;
+    }
+    .hist-btn.del {
+      color: #f87171;
+    }
+
+    /* フッターおよびテンキー */
+    footer {
+      flex: none;
+      background-color: #0c0c0e;
+      border-top: 1px solid var(--border);
+      padding: 6px 8px 10px;
+    }
+    .keypad {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 5px;
+      max-width: 440px;
+      margin: 0 auto;
+    }
+    .key-btn {
+      background-color: var(--btn-bg);
+      color: #ffffff;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      height: 44px;
+      font-size: 22px; /* +2pt */
+      font-weight: 700;
+      font-family: ui-monospace, SFMono-Regular, monospace;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
+    }
+    .key-btn:active {
+      background-color: var(--btn-active);
+      transform: scale(0.98);
+    }
+    .key-btn.action {
+      background-color: #3f3f46;
+      font-size: 15px; /* +2pt */
+      color: #e4e4e7;
+    }
+    .key-btn.del {
+      background-color: #3f3f46;
+      color: var(--accent-orange);
+    }
+    .key-btn.save {
+      background-color: #15803d;
+      color: #ffffff;
+      font-size: 15px; /* +2pt */
+      font-weight: 700;
+    }
+
+    /* 保存用モーダル */
+    .modal-backdrop {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0, 0, 0, 0.7);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 200;
+    }
+    .modal-backdrop.show {
+      display: flex;
+    }
+    .modal-box {
+      background: #1c1c1e;
+      border: 1px solid #3f3f46;
+      border-radius: 12px;
+      width: 85%;
+      max-width: 320px;
+      padding: 16px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+    }
+    .modal-box h3 {
+      font-size: 16px;
+      margin-bottom: 10px;
+    }
+    .modal-box input {
+      width: 100%;
+      background: #000;
+      border: 1px solid #52525b;
+      color: #fff;
+      font-size: 16px;
+      padding: 8px 10px;
+      border-radius: 6px;
+      margin-bottom: 14px;
+      outline: none;
+    }
+    .modal-box .btn-row {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+    .modal-btn {
+      padding: 6px 14px;
+      font-size: 14px;
+      font-weight: 600;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+    }
+    .modal-btn.cancel {
+      background: #3f3f46;
+      color: #fff;
+    }
+    .modal-btn.confirm {
+      background: #15803d;
+      color: #fff;
+    }
+
+    #toast {
+      position: fixed;
+      top: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: #27272a;
+      border: 1px solid #52525b;
+      color: #ffffff;
+      font-size: 14px;
+      font-weight: 600;
+      padding: 6px 16px;
+      border-radius: 20px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+      z-index: 300;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>図面材料計算</h1>
+    <div class="brand">KYOWA ROOF 仕様</div>
+  </header>
+
+  <div class="tab-bar">
+    <button class="tab-btn active" id="tab-dim" onclick="setMode('dim')">① 寸法割付</button>
+    <button class="tab-btn" id="tab-area" onclick="setMode('area')">② 面積計算</button>
+    <button class="tab-btn" id="tab-hist" onclick="setMode('hist')">③ 保存一覧</button>
+  </div>
+
+  <main>
+    <!-- ① 寸法割付タブ専用エリア -->
+    <div id="section-dim-tab" style="display: flex; flex-direction: column; gap: 8px;">
+      <!-- 端寸ステータス表示（片張余り・芯割余り） -->
+      <div class="status-row">
+        <div class="status-card blue">
+          <div class="status-title">片張余り</div>
+          <div class="status-num" id="disp-end-dim">0<span>mm</span></div>
+        </div>
+        <div class="status-card green">
+          <div class="status-title">芯割余り</div>
+          <div class="status-num" id="disp-center-dim">0<span>mm</span></div>
+        </div>
+      </div>
+
+      <!-- 全幅・最長 -->
+      <div class="grid-row-2">
+        <div class="input-box" id="box-wallW" onclick="selectField('wallW')">
+          <div class="input-label">全幅</div>
+          <div class="input-val" id="val-wallW">10000</div>
+        </div>
+        <div class="input-box" id="box-wallH" onclick="selectField('wallH')">
+          <div class="input-label">最長</div>
+          <div class="input-val" id="val-wallH">6000</div>
+        </div>
+      </div>
+
+      <!-- 働幅 & 開口数 -->
+      <div class="grid-row-2">
+        <div class="input-box active" id="box-pitch" onclick="selectField('pitch')">
+          <div class="input-label">働幅</div>
+          <div class="input-val" id="val-pitch">780</div>
+        </div>
+        <div class="input-box" id="box-opCount" onclick="selectField('opCount')">
+          <div class="input-label">開口数</div>
+          <div class="input-val" id="val-opCount">0</div>
+        </div>
+      </div>
+
+      <!-- 開口寸法（開口幅・開口高） -->
+      <div class="grid-row-2">
+        <div class="input-box" id="box-opW" onclick="selectField('opW')">
+          <div class="input-label">開口幅</div>
+          <div class="input-val" id="val-opW">0</div>
+        </div>
+        <div class="input-box" id="box-opH" onclick="selectField('opH')">
+          <div class="input-label">開口高</div>
+          <div class="input-val" id="val-opH">0</div>
+        </div>
+      </div>
+
+      <!-- 開口下高さ -->
+      <div class="input-box" id="box-opY" onclick="selectField('opY')">
+        <div class="input-label">開口下高さ</div>
+        <div class="input-val" id="val-opY">0</div>
+      </div>
+
+      <!-- 材料取り内訳（寸法割付タブ専用） -->
+      <div class="summary-card">
+        <div class="summary-row">
+          <div class="sum-title">【結果】総必要枚数</div>
+          <div class="sum-val" style="color:var(--accent-blue); font-size:19px;" id="res-total-sheets">13 枚</div>
+        </div>
+        <div class="summary-row">
+          <div class="sum-title">① 最長部 (通し材)</div>
+          <div class="sum-val" id="res-full-info">L=6000mm × 13枚</div>
+        </div>
+        <div class="summary-row">
+          <div class="sum-title">② 開口部上</div>
+          <div class="sum-val" id="res-top-info">L=0mm × 0枚</div>
+        </div>
+        <div class="summary-row">
+          <div class="sum-title">③ 開口部下</div>
+          <div class="sum-val" id="res-bot-info">L=0mm × 0枚</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ② 面積計算タブ専用エリア（必要項目のみ表示・テンキー非表示） -->
+    <div id="section-area-tab" style="display: none; flex-direction: column; gap: 10px; padding-top: 4px;">
+      <!-- 一番上：全幅 × 最長 の全体面積 -->
+      <div class="area-total-card">
+        <div>
+          <div class="area-total-title">全幅 × 最長（全体面積）</div>
+          <div id="area-calc-formula" style="font-size:14px; color:var(--sub-text); margin-top:2px;">W 10000 × H 6000</div>
+        </div>
+        <div class="area-total-val" id="area-gross">60.00<span>㎡</span></div>
+      </div>
+
+      <div class="area-stat-grid">
+        <div class="area-stat-card" style="border: 2px solid var(--accent-blue); padding: 12px 10px;">
+          <div class="area-stat-title" style="font-size: 14px; color: var(--accent-blue); font-weight:700;">全体-開口部</div>
+          <div class="area-stat-val" id="area-net" style="font-size: 24px; color: var(--accent-blue); margin-top: 4px;">0.00<span>㎡</span></div>
+        </div>
+        <div class="area-stat-card" style="border: 2px solid var(--accent-green); padding: 12px 10px;">
+          <div class="area-stat-title" style="font-size: 14px; color: var(--accent-green); font-weight:700;">開口合計</div>
+          <div class="area-stat-val" id="area-op" style="font-size: 24px; color: var(--accent-green); margin-top: 4px;">0.00<span>㎡</span></div>
+        </div>
+      </div>
+
+      <div class="summary-card" style="padding: 12px 14px;">
+        <div style="font-size:15px; font-weight:700; color:#d4d4d8; margin-bottom:8px; border-bottom:1px solid #27272a; padding-bottom:6px;">
+          寸法違い 各1枚あたりの㎡
+        </div>
+        <div class="summary-row" style="padding: 8px 0;">
+          <div class="sum-title" style="font-size: 15px;">最長材 (1枚)</div>
+          <div class="sum-val" id="area-single-full" style="font-size: 17px; color: #ffffff;">0.000 ㎡</div>
+        </div>
+        <div class="summary-row" style="padding: 8px 0;">
+          <div class="sum-title" style="font-size: 15px;">開口上 (1枚)</div>
+          <div class="sum-val" id="area-single-top" style="font-size: 17px; color: #ffffff;">0.000 ㎡</div>
+        </div>
+        <div class="summary-row" style="padding: 8px 0;">
+          <div class="sum-title" style="font-size: 15px;">開口下 (1枚)</div>
+          <div class="sum-val" id="area-single-bot" style="font-size: 17px; color: #ffffff;">0.000 ㎡</div>
+        </div>
+      </div>
+
+      <!-- 面積計算タブ内の保存済みデータ蓄積エリア -->
+      <div style="margin-top: 4px; display:flex; flex-direction:column; gap:8px;">
+        <div style="font-size: 14px; font-weight: 700; color: #a1a1aa; display:flex; justify-content:space-between; align-items:center;">
+          <span>保存済み 面積データ</span>
+          <span style="font-size: 14px; font-weight: 500; color: var(--sub-text);">※寸法割付保存時に自動記録</span>
+        </div>
+        <div id="area-history-list" style="display: flex; flex-direction: column; gap: 8px;"></div>
+      </div>
+    </div>
+
+    <!-- ③ 保存一覧表示エリア -->
+    <div id="section-history" style="display: none;">
+      <div id="history-list" style="display: flex; flex-direction: column; gap: 8px;"></div>
+    </div>
+  </main>
+
+  <footer id="main-footer">
+    <div class="keypad">
+      <button class="key-btn" onclick="pressKey('7')">7</button>
+      <button class="key-btn" onclick="pressKey('8')">8</button>
+      <button class="key-btn" onclick="pressKey('9')">9</button>
+
+      <button class="key-btn" onclick="pressKey('4')">4</button>
+      <button class="key-btn" onclick="pressKey('5')">5</button>
+      <button class="key-btn" onclick="pressKey('6')">6</button>
+
+      <button class="key-btn" onclick="pressKey('1')">1</button>
+      <button class="key-btn" onclick="pressKey('2')">2</button>
+      <button class="key-btn" onclick="pressKey('3')">3</button>
+
+      <button class="key-btn" onclick="pressKey('0')">0</button>
+      <button class="key-btn" onclick="pressKey('00')">00</button>
+      <button class="key-btn" onclick="pressKey('.')">.</button>
+
+      <button class="key-btn del" onclick="pressBack()">⌫</button>
+      <button class="key-btn action" onclick="clearField()">クリア</button>
+      <button class="key-btn save" onclick="openSaveModal()">保存</button>
+    </div>
+  </footer>
+
+  <!-- タイトル入力用モーダル -->
+  <div class="modal-backdrop" id="save-modal">
+    <div class="modal-box">
+      <h3>保存タイトルの入力</h3>
+      <input type="text" id="save-title-input" placeholder="例: 〇〇邸 西面外壁" maxlength="30">
+      <div class="btn-row">
+        <button class="modal-btn cancel" onclick="closeSaveModal()">キャンセル</button>
+        <button class="modal-btn confirm" onclick="confirmSave()">保存する</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast">保存しました</div>
+
+  <script>
+    const state = {
+      mode: 'dim',
+      activeField: 'pitch',
+      isOverwrite: true, // 入力欄選択直後の上書きフラグ
+      values: {
+        wallW: '10000',
+        wallH: '6000',
+        pitch: '780',
+        opCount: '0',
+        opW: '0',
+        opH: '0',
+        opY: '0'
+      }
+    };
+
+    const MODES = ['dim', 'area', 'hist'];
+
+    // オフライン対応 IndexedDB 初期化
+    const DB_NAME = 'BankinCalcDB';
+    const STORE_NAME = 'calculations';
+    let dbInstance = null;
+
+    function initDB() {
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open(DB_NAME, 1);
+        req.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains(STORE_NAME)) {
+            db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
+          }
+        };
+        req.onsuccess = (e) => {
+          dbInstance = e.target.result;
+          resolve(dbInstance);
+        };
+        req.onerror = (e) => reject(e);
+      });
+    }
+
+    function setMode(mode) {
+      state.mode = mode;
+      const tabDim = document.getElementById('tab-dim');
+      const tabArea = document.getElementById('tab-area');
+      const tabHist = document.getElementById('tab-hist');
+      const secDimTab = document.getElementById('section-dim-tab');
+      const secAreaTab = document.getElementById('section-area-tab');
+      const secHist = document.getElementById('section-history');
+      const footer = document.getElementById('main-footer');
+
+      tabDim.classList.remove('active');
+      tabArea.classList.remove('active');
+      tabHist.classList.remove('active');
+
+      if (mode === 'dim') {
+        tabDim.classList.add('active');
+        secDimTab.style.display = 'flex';
+        secAreaTab.style.display = 'none';
+        secHist.style.display = 'none';
+        footer.style.display = 'block'; // テンキー表示
+        selectField(state.activeField || 'wallW');
+      } else if (mode === 'area') {
+        tabArea.classList.add('active');
+        secDimTab.style.display = 'none';
+        secAreaTab.style.display = 'flex';
+        secHist.style.display = 'none';
+        footer.style.display = 'none'; // 自動計算のためテンキー非表示
+        loadAreaHistoryList();
+      } else if (mode === 'hist') {
+        tabHist.classList.add('active');
+        secDimTab.style.display = 'none';
+        secAreaTab.style.display = 'none';
+        secHist.style.display = 'flex';
+        footer.style.display = 'none'; // 保存一覧ではテンキー非表示
+        loadHistoryList();
+      }
+      calculate();
+    }
+
+    // タブ左右スワイプ対応
+    let touchStartX = 0;
+    let touchStartY = 0;
+
+    window.addEventListener('touchstart', (e) => {
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+    }, { passive: true });
+
+    window.addEventListener('touchend', (e) => {
+      const touchEndX = e.changedTouches[0].clientX;
+      const touchEndY = e.changedTouches[0].clientY;
+      const diffX = touchEndX - touchStartX;
+      const diffY = touchEndY - touchStartY;
+
+      // 縦スクロールと誤認しないように横移動が大きい場合のみ判定 (50px以上)
+      if (Math.abs(diffX) > 50 && Math.abs(diffX) > Math.abs(diffY) * 1.5) {
+        const currIdx = MODES.indexOf(state.mode);
+        if (diffX < 0 && currIdx < MODES.length - 1) {
+          // 左スワイプ -> 次のタブへ
+          setMode(MODES[currIdx + 1]);
+        } else if (diffX > 0 && currIdx > 0) {
+          // 右スワイプ -> 前のタブへ
+          setMode(MODES[currIdx - 1]);
+        }
+      }
+    }, { passive: true });
+
+    // 入力欄選択時に「上書き待機状態」にする
+    function selectField(field) {
+      state.activeField = field;
+      state.isOverwrite = true; // 上書きフラグを立てる
+      document.querySelectorAll('.input-box').forEach(el => el.classList.remove('active'));
+      const activeEl = document.getElementById(`box-${field}`);
+      if (activeEl) activeEl.classList.add('active');
+    }
+
+    function pressKey(key) {
+      const field = state.activeField;
+
+      // 選択直後の場合は既存の値を上書き
+      if (state.isOverwrite) {
+        state.values[field] = (key === '.') ? '0.' : (key === '00' ? '0' : key);
+        state.isOverwrite = false;
+      } else {
+        let curr = state.values[field] || '';
+        if (curr === '0' && key !== '.') {
+          curr = '';
+        }
+        if (key === '.' && curr.includes('.')) {
+          return;
+        }
+        if (curr.length >= 8) return;
+        curr += key;
+        state.values[field] = curr;
+      }
+
+      updateDisplay();
+      calculate();
+    }
+
+    function pressBack() {
+      state.isOverwrite = false;
+      const field = state.activeField;
+      let curr = state.values[field] || '';
+      if (curr.length > 1) {
+        curr = curr.slice(0, -1);
+      } else {
+        curr = '0';
+      }
+      state.values[field] = curr;
+      updateDisplay();
+      calculate();
+    }
+
+    function clearField() {
+      state.values[state.activeField] = '0';
+      state.isOverwrite = true;
+      updateDisplay();
+      calculate();
+    }
+
+    function updateDisplay() {
+      for (let k in state.values) {
+        const el = document.getElementById(`val-${k}`);
+        if (el) el.textContent = state.values[k];
+      }
+    }
+
+    // 小数点第3位を無条件切り上げして小数点第2位（0.00）形式にする関数
+    function ceilTo2(num) {
+      if (isNaN(num) || num <= 0) return '0.00';
+      // 浮動小数点数の計算誤差（0.000000001等）を吸収して切り上げ
+      const rounded = Math.round(num * 1000000) / 10000;
+      const ceiled = Math.ceil(rounded) / 100;
+      return ceiled.toFixed(2);
+    }
+
+    function calculate() {
+      const Pitch = parseFloat(state.values.pitch) || 0;
+      const OpCount = parseFloat(state.values.opCount) || 0;
+      const OpW = parseFloat(state.values.opW) || 0;
+      const OpH = parseFloat(state.values.opH) || 0;
+      const OpY = parseFloat(state.values.opY) || 0;
+      const W = parseFloat(state.values.wallW) || 0;
+      const H = parseFloat(state.values.wallH) || 0;
+
+      // 1. 面積計算（全て小数点第2位まで・切り上げ）
+      const grossM2Raw = (W * H) / 1000000;
+      const totalOpM2Raw = (OpW * OpH * OpCount) / 1000000;
+      const netM2Raw = Math.max(0, grossM2Raw - totalOpM2Raw);
+
+      const topLength = Math.max(0, H - (OpH + OpY));
+      const botLength = OpY;
+
+      const singleFullM2Raw = (Pitch * H) / 1000000;
+      const singleTopM2Raw = (Pitch * topLength) / 1000000;
+      const singleBotM2Raw = (Pitch * botLength) / 1000000;
+
+      const grossM2 = ceilTo2(grossM2Raw);
+      const totalOpM2 = ceilTo2(totalOpM2Raw);
+      const netM2 = ceilTo2(netM2Raw);
+      const singleFullM2 = ceilTo2(singleFullM2Raw);
+      const singleTopM2 = ceilTo2(singleTopM2Raw);
+      const singleBotM2 = ceilTo2(singleBotM2Raw);
+
+      // 面積表示反映
+      const grossEl = document.getElementById('area-gross');
+      const grossFormulaEl = document.getElementById('area-calc-formula');
+      const netEl = document.getElementById('area-net');
+      const opEl = document.getElementById('area-op');
+      const sFullEl = document.getElementById('area-single-full');
+      const sTopEl = document.getElementById('area-single-top');
+      const sBotEl = document.getElementById('area-single-bot');
+
+      if (grossEl) grossEl.innerHTML = `${grossM2}<span>㎡</span>`;
+      if (grossFormulaEl) grossFormulaEl.textContent = `W ${W} × H ${H}`;
+      if (netEl) netEl.innerHTML = `${netM2}<span>㎡</span>`;
+      if (opEl) opEl.innerHTML = `${totalOpM2}<span>㎡</span>`;
+      if (sFullEl) sFullEl.textContent = `${singleFullM2} ㎡ (L=${H}mm)`;
+      if (sTopEl) sTopEl.textContent = `${singleTopM2} ㎡ (L=${topLength}mm)`;
+      if (sBotEl) sBotEl.textContent = `${botLength > 0 ? singleBotM2 + ' ㎡ (L=' + botLength + 'mm)' : '0.00 ㎡ (なし)'}`;
+
+      // 2. 寸法割付計算
+      if (Pitch <= 0 || W <= 0) {
+        document.getElementById('disp-end-dim').innerHTML = `0<span>mm</span>`;
+        document.getElementById('disp-center-dim').innerHTML = `0<span>mm</span>`;
+        document.getElementById('res-total-sheets').textContent = '0 枚';
+        document.getElementById('res-full-info').textContent = `L=${H}mm × 0枚`;
+        document.getElementById('res-top-info').textContent = `L=0mm × 0枚`;
+        document.getElementById('res-bot-info').textContent = `L=0mm × 0枚`;
+        return;
+      }
+
+      // 片張余り・芯割余り
+      const mod = W % Pitch;
+      const endDim = (mod === 0) ? Pitch : Math.round(mod);
+      const centerDim = (mod === 0) ? Pitch : Math.round((mod + Pitch) / 2);
+
+      document.getElementById('disp-end-dim').innerHTML = `${endDim}<span>mm</span>`;
+      document.getElementById('disp-center-dim').innerHTML = `${centerDim}<span>mm</span>`;
+
+      // 数量計算（最長部切り上げ、開口切り下げ）
+      const totalSheets = Math.ceil(W / Pitch);
+      const opSheetsPerLoc = Math.floor(OpW / Pitch);
+      const totalOpSheets = (OpW > 0 && OpCount > 0) ? (opSheetsPerLoc * OpCount) : 0;
+      const fullSheets = Math.max(0, totalSheets - totalOpSheets);
+
+      document.getElementById('res-total-sheets').textContent = `${totalSheets.toLocaleString()} 枚`;
+      document.getElementById('res-full-info').textContent = `L=${H}mm × ${fullSheets}枚`;
+      document.getElementById('res-top-info').textContent = `L=${topLength}mm × ${totalOpSheets}枚`;
+      document.getElementById('res-bot-info').textContent = `L=${botLength}mm × ${OpY > 0 ? totalOpSheets : 0}枚`;
+    }
+
+    async function openSaveModal() {
+      let count = 1;
+      try {
+        const db = dbInstance || await initDB();
+        const tx = db.transaction(STORE_NAME, 'readonly');
+        const store = tx.objectStore(STORE_NAME);
+        const req = store.count();
+        await new Promise((res) => {
+          req.onsuccess = () => {
+            count = (req.result || 0) + 1;
+            res();
+          };
+          req.onerror = () => res();
+        });
+      } catch (e) {}
+
+      // 日付は含めず連番「No.〇」のみを初期値とする（現場名などを直接手入力できるように後ろに半角スペースを付与）
+      const defaultTitle = `No.${count} `;
+      const input = document.getElementById('save-title-input');
+      input.value = defaultTitle;
+      document.getElementById('save-modal').classList.add('show');
+      input.focus();
+    }
+
+    function closeSaveModal() {
+      document.getElementById('save-modal').classList.remove('show');
+    }
+
+    async function confirmSave() {
+      const titleInput = document.getElementById('save-title-input');
+      const title = titleInput.value.trim() || 'No.未設定';
+
+      const dataRecord = {
+        title: title,
+        date: new Date().toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+        mode: state.mode === 'area' ? '面積計算' : '寸法割付',
+        values: JSON.parse(JSON.stringify(state.values)),
+        results: {
+          total: document.getElementById('res-total-sheets').textContent,
+          full: document.getElementById('res-full-info').textContent,
+          top: document.getElementById('res-top-info').textContent,
+          bot: document.getElementById('res-bot-info').textContent,
+          endDim: document.getElementById('disp-end-dim').textContent,
+          centerDim: document.getElementById('disp-center-dim').textContent,
+          grossM2: document.getElementById('area-gross').textContent,
+          grossFormula: document.getElementById('area-calc-formula').textContent,
+          netM2: document.getElementById('area-net').textContent,
+          opM2: document.getElementById('area-op').textContent,
+          sFull: document.getElementById('area-single-full').textContent,
+          sTop: document.getElementById('area-single-top').textContent,
+          sBot: document.getElementById('area-single-bot').textContent
+        }
+      };
+
+      try {
+        const db = dbInstance || await initDB();
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        tx.objectStore(STORE_NAME).add(dataRecord);
+        tx.oncomplete = () => {
+          closeSaveModal();
+          showToast(`「${title}」を保存しました`);
+          loadAreaHistoryList();
+        };
+      } catch (err) {
+        showToast('保存に失敗しました');
+      }
+    }
+
+    async function loadAreaHistoryList() {
+      const listEl = document.getElementById('area-history-list');
+      if (!listEl) return;
+      listEl.innerHTML = '';
+
+      try {
+        const db = dbInstance || await initDB();
+        const tx = db.transaction(STORE_NAME, 'readonly');
+        const store = tx.objectStore(STORE_NAME);
+        const req = store.getAll();
+
+        req.onsuccess = () => {
+          const items = req.result || [];
+          if (items.length === 0) {
+            listEl.innerHTML = '<div style="color:var(--sub-text); text-align:center; padding: 14px 0; font-size:14px;">保存された面積データはありません</div>';
+            return;
+          }
+
+          items.reverse().forEach(item => {
+            const res = item.results || {};
+            const card = document.createElement('div');
+            card.className = 'area-hist-card';
+            card.innerHTML = `
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div style="font-weight:700; color:#fff; font-size:15px;">${escapeHtml(item.title)}</div>
+                <div style="font-size:14px; color:var(--sub-text);">${item.date}</div>
+              </div>
+              <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:4px; margin-top:4px; font-size:14px;">
+                <div style="color:#d4d4d8;">全体: <strong style="color:#fff;">${res.grossM2 || '―'}</strong></div>
+                <div style="color:#d4d4d8;">全体-開口: <strong style="color:var(--accent-blue);">${res.netM2 || '―'}</strong></div>
+                <div style="color:#d4d4d8;">開口合計: <strong style="color:var(--accent-green);">${res.opM2 || '―'}</strong></div>
+              </div>
+              <div style="font-size:14px; color:var(--sub-text); margin-top:2px;">
+                寸法(${res.grossFormula || '―'})
+              </div>
+              <div style="display:flex; flex-direction:column; gap:2px; font-size:14px; color:#d4d4d8; margin-top:4px; border-top:1px solid #27272a; padding-top:4px;">
+                <div>最長材(1枚): <strong style="color:#fff;">${res.sFull || '―'}</strong></div>
+                <div>開口上(1枚): <strong style="color:#fff;">${res.sTop || '―'}</strong></div>
+                ${res.sBot && !res.sBot.includes('なし') && !res.sBot.includes('0.000') ? `<div>開口下(1枚): <strong style="color:#fff;">${res.sBot}</strong></div>` : ''}
+              </div>
+            `;
+            listEl.appendChild(card);
+          });
+        };
+      } catch (e) {
+        listEl.innerHTML = '<div style="color:#f87171; text-align:center; padding: 10px; font-size:14px;">読み込みに失敗しました</div>';
+      }
+    }
+
+    async function loadHistoryList() {
+      const listEl = document.getElementById('history-list');
+      listEl.innerHTML = '';
+
+      try {
+        const db = dbInstance || await initDB();
+        const tx = db.transaction(STORE_NAME, 'readonly');
+        const store = tx.objectStore(STORE_NAME);
+        const req = store.getAll();
+
+        req.onsuccess = () => {
+          const items = req.result || [];
+          if (items.length === 0) {
+            listEl.innerHTML = '<div style="color:var(--sub-text); text-align:center; padding: 30px 0; font-size:14px;">保存されたデータはありません</div>';
+            return;
+          }
+
+          items.reverse().forEach(item => {
+            const card = document.createElement('div');
+            card.className = 'history-card';
+            card.innerHTML = `
+              <div class="history-head">
+                <div class="history-title">${escapeHtml(item.title)}</div>
+                <div class="history-date">${item.date}</div>
+              </div>
+              <div class="history-body">
+                <div>総枚数: <strong style="color:var(--accent-blue); font-size:17px;">${item.results.total}</strong> (働幅: ${item.values.pitch}mm)</div>
+                <div>全体面積: ${item.results.grossM2 || '―'} / 実面積: ${item.results.netM2 || '―'} / 開口: ${item.results.opM2 || '―'}</div>
+                <div>片張余り: ${item.results.endDim} / 芯割余り: ${item.results.centerDim}</div>
+                <div>通し材: ${item.results.full}</div>
+                ${item.results.top.includes('× 0枚') ? '' : `<div>開口上: ${item.results.top}</div>`}
+                ${item.results.bot.includes('× 0枚') ? '' : `<div>開口下: ${item.results.bot}</div>`}
+              </div>
+              <div class="history-actions">
+                <button class="hist-btn del" onclick="deleteHistory(${item.id})">削除</button>
+                <button class="hist-btn load" onclick="loadHistory(${item.id})">呼出</button>
+              </div>
+            `;
+            listEl.appendChild(card);
+          });
+        };
+      } catch (e) {
+        listEl.innerHTML = '<div style="color:#f87171; text-align:center; padding: 20px; font-size:14px;">読み込みに失敗しました</div>';
+      }
+    }
+
+    async function loadHistory(id) {
+      const db = dbInstance || await initDB();
+      const tx = db.transaction(STORE_NAME, 'readonly');
+      const req = tx.objectStore(STORE_NAME).get(id);
+      req.onsuccess = () => {
+        const item = req.result;
+        if (item) {
+          state.values = JSON.parse(JSON.stringify(item.values));
+          state.isOverwrite = true;
+          updateDisplay();
+          setMode('dim');
+          showToast(`「${item.title}」を呼び出しました`);
+        }
+      };
+    }
+
+    async function deleteHistory(id) {
+      const db = dbInstance || await initDB();
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      tx.objectStore(STORE_NAME).delete(id);
+      tx.oncomplete = () => {
+        loadHistoryList();
+        showToast('削除しました');
+      };
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      toast.textContent = msg;
+      toast.style.opacity = '1';
+      setTimeout(() => {
+        toast.style.opacity = '0';
+      }, 1600);
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/[&<>'"]/g, tag => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        "'": '&#39;',
+        '"': '&quot;'
+      }[tag] || tag));
+    }
+
+
+    // PWA: Service Worker 登録
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js', { scope: './' })
+          .catch((error) => console.error('Service Worker registration failed:', error));
+      });
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      initDB();
+      updateDisplay();
+      calculate();
+    });
+  </script>
+</body>
+</html>
