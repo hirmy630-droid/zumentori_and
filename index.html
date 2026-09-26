@@ -3,11 +3,6 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <link rel="manifest" href="./manifest.json">
-  <link rel="apple-touch-icon" sizes="180x180" href="./icon-180.png">
-  <meta name="theme-color" content="#000000">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-title" content="図面材料計算">
   <title>図面材料計算</title>
   <style>
     :root {
@@ -181,7 +176,7 @@
     /* 内訳サマリーテーブル */
     .summary-card {
       background-color: var(--card-bg);
-      border: 1px solid var(--border);
+      border: 1px solid var(--accent-orange);
       border-radius: 8px;
       padding: 8px 12px;
       font-size: 14px; /* +2pt */
@@ -474,9 +469,9 @@
   </header>
 
   <div class="tab-bar">
-    <button class="tab-btn active" id="tab-dim" onclick="setMode('dim')">① 寸法割付</button>
-    <button class="tab-btn" id="tab-area" onclick="setMode('area')">② 面積計算</button>
-    <button class="tab-btn" id="tab-hist" onclick="setMode('hist')">③ 保存一覧</button>
+    <button class="tab-btn active" id="tab-dim" onclick="setMode('dim')">寸法割付</button>
+    <button class="tab-btn" id="tab-area" onclick="setMode('area')">面積計算</button>
+    <button class="tab-btn" id="tab-hist" onclick="setMode('hist')">保存一覧</button>
   </div>
 
   <main>
@@ -1110,15 +1105,6 @@
         "'": '&#39;',
         '"': '&quot;'
       }[tag] || tag));
-    }
-
-
-    // PWA: Service Worker 登録
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js', { scope: './' })
-          .catch((error) => console.error('Service Worker registration failed:', error));
-      });
     }
 
     window.addEventListener('DOMContentLoaded', () => {
