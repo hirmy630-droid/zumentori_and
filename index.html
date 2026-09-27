@@ -3,1120 +3,1154 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>図面材料計算</title>
+  <title>図面AI自動読取＆材料計算 (iPhone専用)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- PDF.js: PDF図面を高精細展開 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  </script>
+  <!-- Cropper.js: iPhoneタッチ操作対応の画像切り抜き -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
+  <!-- html2canvas: 画面キャプチャ保存 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <meta name="theme-color" content="#09090b">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <style>
     :root {
       --bg: #000000;
       --card-bg: #141416;
-      --panel-bg: #1c1c1e;
-      --text: #ffffff;
-      --sub-text: #8e8e93;
-      --accent-orange: #f97316;
-      --accent-blue: #0ea5e9;
-      --accent-green: #22c55e;
-      --btn-bg: #262629;
-      --btn-active: #3a3a3d;
       --border: #27272a;
     }
-
     * {
       box-sizing: border-box;
-      margin: 0;
-      padding: 0;
       -webkit-tap-highlight-color: transparent;
-      user-select: none;
     }
-
     body {
       background-color: var(--bg);
-      color: var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      display: flex;
-      flex-direction: column;
+      color: #ffffff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       height: 100vh;
-      width: 100vw;
-      overflow: hidden;
-      font-size: 15px; /* 全体+2pt拡大 */
+      height: 100dvh;
       padding-top: env(safe-area-inset-top);
-      padding-bottom: env(safe-area-inset-bottom);
+      padding-left: env(safe-area-inset-left);
+      padding-right: env(safe-area-inset-right);
     }
-
-    /* ヘッダー */
-    header {
-      flex: none;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 12px 14px 8px;
-      border-bottom: 1px solid var(--border);
+    /* スクロールバーの細線化 */
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 4px;
     }
-    header h1 {
-      font-size: 18px; /* +2pt */
-      font-weight: 700;
-      letter-spacing: 0.03em;
-    }
-    header .brand {
-      font-size: 14px; /* 最低フォントサイズ14px */
-      color: var(--sub-text);
-      font-weight: 700;
-      letter-spacing: 0.05em;
-    }
-
-    /* タブ切り替えバー（3タブ化） */
-    .tab-bar {
-      flex: none;
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 4px;
-      background-color: var(--card-bg);
-      margin: 6px 12px;
-      padding: 3px;
-      border-radius: 8px;
-    }
-    .tab-btn {
-      padding: 8px 0;
-      text-align: center;
-      font-size: 15px; /* +2pt */
-      font-weight: 600;
-      color: var(--sub-text);
-      border: none;
-      background: none;
-      border-radius: 6px;
-      cursor: pointer;
-      transition: all 0.15s ease;
-    }
-    .tab-btn.active {
-      background-color: #3f3f46;
-      color: #ffffff;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.5);
-    }
-
-    /* メインスクロールエリア */
-    main {
-      flex: 1;
-      overflow-y: auto;
-      padding: 0 12px 6px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    /* 端寸ステータス表示（片張余り・芯割余り） */
-    .status-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-    }
-    .status-card {
-      background-color: var(--card-bg);
-      border-radius: 10px;
-      padding: 8px 12px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .status-card.blue {
-      border: 2px solid var(--accent-blue);
-    }
-    .status-card.green {
-      border: 2px solid var(--accent-green);
-    }
-    .status-title {
-      font-size: 14px; /* +2pt */
-      font-weight: 700;
-      line-height: 1.3;
-    }
-    .status-card.blue .status-title { color: var(--accent-blue); }
-    .status-card.green .status-title { color: var(--accent-green); }
-    .status-num {
-      font-size: 21px; /* +2pt */
-      font-weight: 800;
-      font-family: ui-monospace, SFMono-Regular, monospace;
-    }
-    .status-num span {
-      font-size: 14px; /* 最低フォントサイズ14px */
-      font-weight: 500;
-      color: var(--sub-text);
-      margin-left: 2px;
-    }
-
-    .grid-row-2 {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 6px;
-    }
-    .input-box {
-      background-color: var(--card-bg);
-      border: 2px solid var(--border);
-      border-radius: 8px;
-      padding: 8px 10px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      cursor: pointer;
-      transition: border-color 0.15s ease;
-    }
-    .input-box.active {
-      border-color: var(--accent-orange) !important;
-      box-shadow: 0 0 0 1px var(--accent-orange);
-      background-color: #1f1b16;
-    }
-    .input-label {
-      font-size: 14px; /* 最低フォントサイズ14px */
-      font-weight: 600;
-      color: #a1a1aa;
-    }
-    .input-val {
-      font-size: 21px; /* +2pt */
-      font-weight: 800;
-      font-family: ui-monospace, SFMono-Regular, monospace;
-      color: #ffffff;
-    }
-
-    /* 内訳サマリーテーブル */
-    .summary-card {
-      background-color: var(--card-bg);
-      border: 1px solid var(--accent-orange);
-      border-radius: 8px;
-      padding: 8px 12px;
-      font-size: 14px; /* +2pt */
-    }
-    .summary-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 5px 0;
-      border-bottom: 1px solid #27272a;
-    }
-    .summary-row:last-child {
-      border-bottom: none;
-    }
-    .sum-title {
-      color: #a1a1aa;
-      font-weight: 600;
-    }
-    .sum-val {
-      font-weight: 700;
-      font-family: ui-monospace, SFMono-Regular, monospace;
-      font-size: 16px; /* +1pt拡大 */
-    }
-
-    /* 面積タブ用専用スタイル */
-    .area-stat-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-    }
-    .area-stat-card {
-      background-color: var(--card-bg);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 10px 12px;
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-    .area-stat-title {
-      font-size: 14px; /* 最低フォントサイズ14px */
-      font-weight: 600;
-      color: #a1a1aa;
-    }
-    .area-stat-val {
-      font-size: 20px; /* +1pt */
-      font-weight: 800;
-      font-family: ui-monospace, SFMono-Regular, monospace;
-      color: #ffffff;
-    }
-    .area-stat-val span {
-      font-size: 14px; /* 最低フォントサイズ14px */
-      color: var(--sub-text);
-      margin-left: 2px;
-    }
-
-    /* 面積タブ用 全幅×最長 メインカード */
-    .area-total-card {
-      background-color: var(--card-bg);
-      border: 1px solid #3f3f46;
-      border-radius: 8px;
-      padding: 12px 14px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .area-total-title {
-      font-size: 14px;
-      font-weight: 700;
-      color: #e4e4e7;
-    }
-    .area-total-val {
-      font-size: 26px;
-      font-weight: 800;
-      font-family: ui-monospace, SFMono-Regular, monospace;
-      color: #ffffff;
-    }
-    .area-total-val span {
-      font-size: 14px;
-      color: var(--sub-text);
-      margin-left: 2px;
-    }
-
-    /* 面積タブ 保存済みカード */
-    .area-hist-card {
-      background-color: var(--card-bg);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 10px 12px;
-      display: flex;
-      flex-direction: column;
-      gap: 5px;
-    }
-
-    /* 保存データ一覧スタイル（面積データとサイズ統一） */
-    #section-history {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-    .history-card {
-      background-color: var(--card-bg);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 10px 12px;
-      display: flex;
-      flex-direction: column;
-      gap: 5px;
-    }
-    .history-head {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .history-title {
-      font-size: 15px; /* 面積データと同じ15px */
-      font-weight: 700;
-      color: #ffffff;
-    }
-    .history-date {
-      font-size: 14px; /* 最低フォントサイズ14px */
-      color: var(--sub-text);
-    }
-    .history-body {
-      font-size: 14px; /* 最低フォントサイズ14px */
-      color: #d4d4d8;
-      line-height: 1.4;
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
-    .history-actions {
-      display: flex;
-      justify-content: flex-end;
-      gap: 8px;
-      margin-top: 4px;
-    }
-    .hist-btn {
-      padding: 5px 12px;
-      font-size: 14px; /* 最低フォントサイズ14px */
-      font-weight: 600;
-      border-radius: 6px;
-      border: 1px solid var(--border);
-      background: #27272a;
-      color: #fff;
-      cursor: pointer;
-    }
-    .hist-btn.load {
-      background-color: #0284c7;
-      border-color: #0284c7;
-    }
-    .hist-btn.del {
-      color: #f87171;
-    }
-
-    /* フッターおよびテンキー */
-    footer {
-      flex: none;
-      background-color: #0c0c0e;
-      border-top: 1px solid var(--border);
-      padding: 6px 8px 10px;
-    }
-    .keypad {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 5px;
-      max-width: 440px;
-      margin: 0 auto;
-    }
-    .key-btn {
-      background-color: var(--btn-bg);
-      color: #ffffff;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      height: 44px;
-      font-size: 22px; /* +2pt */
-      font-weight: 700;
-      font-family: ui-monospace, SFMono-Regular, monospace;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      cursor: pointer;
-    }
-    .key-btn:active {
-      background-color: var(--btn-active);
-      transform: scale(0.98);
-    }
-    .key-btn.action {
-      background-color: #3f3f46;
-      font-size: 15px; /* +2pt */
-      color: #e4e4e7;
-    }
-    .key-btn.del {
-      background-color: #3f3f46;
-      color: var(--accent-orange);
-    }
-    .key-btn.save {
-      background-color: #15803d;
-      color: #ffffff;
-      font-size: 15px; /* +2pt */
-      font-weight: 700;
-    }
-
-    /* 保存用モーダル */
-    .modal-backdrop {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
-      background: rgba(0, 0, 0, 0.7);
-      display: none;
-      justify-content: center;
-      align-items: center;
-      z-index: 200;
-    }
-    .modal-backdrop.show {
-      display: flex;
-    }
-    .modal-box {
-      background: #1c1c1e;
-      border: 1px solid #3f3f46;
-      border-radius: 12px;
-      width: 85%;
-      max-width: 320px;
-      padding: 16px;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.6);
-    }
-    .modal-box h3 {
-      font-size: 16px;
-      margin-bottom: 10px;
-    }
-    .modal-box input {
-      width: 100%;
-      background: #000;
-      border: 1px solid #52525b;
-      color: #fff;
-      font-size: 16px;
-      padding: 8px 10px;
-      border-radius: 6px;
-      margin-bottom: 14px;
-      outline: none;
-    }
-    .modal-box .btn-row {
-      display: flex;
-      justify-content: flex-end;
-      gap: 8px;
-    }
-    .modal-btn {
-      padding: 6px 14px;
-      font-size: 14px;
-      font-weight: 600;
-      border-radius: 6px;
-      border: none;
-      cursor: pointer;
-    }
-    .modal-btn.cancel {
+    .custom-scrollbar::-webkit-scrollbar-thumb {
       background: #3f3f46;
-      color: #fff;
+      border-radius: 4px;
     }
-    .modal-btn.confirm {
-      background: #15803d;
-      color: #fff;
+    /* iOSの自動ズーム防止およびスピンボタン非表示 */
+    input[type=number]::-webkit-inner-spin-button,
+    input[type=number]::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
     }
-
-    #toast {
-      position: fixed;
-      top: 14px;
-      left: 50%;
-      transform: translateX(-50%);
-      background-color: #27272a;
-      border: 1px solid #52525b;
-      color: #ffffff;
-      font-size: 14px;
-      font-weight: 600;
-      padding: 6px 16px;
-      border-radius: 20px;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.2s ease;
-      z-index: 300;
+    input[type=number], input[type=text] {
+      -moz-appearance: textfield;
+      font-size: 16px !important;
+    }
+    .drag-canvas {
+      cursor: grab;
+      user-select: none;
+      touch-action: none;
+    }
+    .drag-canvas:active {
+      cursor: grabbing;
+    }
+    #image-preview, #pdf-canvas, #crop-source-img {
+      image-rendering: -webkit-optimize-contrast;
+      image-rendering: crisp-edges;
+    }
+    /* iPhoneの太い指でも掴みやすいトリミング枠 */
+    .cropper-view-box {
+      outline: 2px solid #f97316;
+    }
+    .cropper-line, .cropper-point {
+      background-color: #f97316;
+    }
+    .cropper-point {
+      width: 18px !important;
+      height: 18px !important;
+      opacity: 0.9 !important;
     }
   </style>
+  <link rel="manifest" href="./manifest.json">
+  <link rel="apple-touch-icon" href="./icon-180.png">
 </head>
-<body>
+<body id="capture-target" class="w-screen overflow-hidden flex flex-col bg-black text-white">
 
-  <header>
-    <h1>図面材料計算</h1>
-    <div class="brand">KYOWA ROOF 仕様</div>
+  <!-- ヘッダー -->
+  <header class="flex-none px-4 py-2.5 border-b border-zinc-800 flex justify-between items-center bg-zinc-950 z-20">
+    <div class="flex items-center gap-2">
+      <span class="inline-block w-2.5 h-2.5 rounded-full bg-orange-500 animate-pulse"></span>
+      <h1 class="text-base font-bold tracking-wide">図面AI読取 & 材料計算</h1>
+    </div>
+    <div class="flex items-center gap-2">
+      <button id="btn-api-key" onclick="openApiKeyModal()" class="text-xs px-3 py-1.5 rounded-lg border border-zinc-700 bg-zinc-900 text-zinc-200 active:scale-95 flex items-center gap-1.5">
+        <span>🔑</span>
+        <span id="label-api-status">API設定</span>
+      </button>
+    </div>
   </header>
 
-  <div class="tab-bar">
-    <button class="tab-btn active" id="tab-dim" onclick="setMode('dim')">寸法割付</button>
-    <button class="tab-btn" id="tab-area" onclick="setMode('area')">面積計算</button>
-    <button class="tab-btn" id="tab-hist" onclick="setMode('hist')">保存一覧</button>
-  </div>
+  <!-- メインエリア（iPhone縦画面特化：デフォルトは計算結果タブを表示） -->
+  <main class="flex-1 overflow-hidden relative" style="padding-bottom: calc(env(safe-area-inset-bottom) + 64px);">
 
-  <main>
-    <!-- ① 寸法割付タブ専用エリア -->
-    <div id="section-dim-tab" style="display: flex; flex-direction: column; gap: 8px;">
-      <!-- 端寸ステータス表示（片張余り・芯割余り） -->
-      <div class="status-row">
-        <div class="status-card blue">
-          <div class="status-title">片張余り</div>
-          <div class="status-num" id="disp-end-dim">0<span>mm</span></div>
+    <!-- ============================================== -->
+    <!-- 画面1: 図面・操作タブ (初期状態: hidden) -->
+    <!-- ============================================== -->
+    <div id="view-drawing" class="h-full hidden flex-col p-3 gap-2.5 overflow-hidden">
+      <!-- 図面ファイル選択枠 -->
+      <div id="drop-zone" onclick="document.getElementById('file-input').click()" class="border-2 border-dashed border-zinc-700 active:border-orange-500 rounded-xl p-3 flex flex-col items-center justify-center text-center cursor-pointer bg-zinc-900/70 flex-none">
+        <input type="file" id="file-input" accept="application/pdf,image/*" class="hidden">
+        <div id="drop-prompt" class="flex flex-col items-center gap-1 pointer-events-none">
+          <div class="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-orange-400">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+          </div>
+          <p class="text-sm font-bold text-zinc-100">タップして図面を選択 / 写真撮影</p>
+          <p class="text-xs text-zinc-400">PDF・PNG・JPEG（最高画質のまま読込）</p>
         </div>
-        <div class="status-card green">
-          <div class="status-title">芯割余り</div>
-          <div class="status-num" id="disp-center-dim">0<span>mm</span></div>
+        <div id="file-info" class="hidden text-xs text-orange-400 font-semibold pointer-events-none"></div>
+      </div>
+
+      <!-- 図面プレビュー表示領域（ピンチズーム・ドラッグ移動） -->
+      <div id="preview-wrapper" class="flex-1 min-h-[160px] bg-zinc-950 rounded-xl border border-zinc-800 relative overflow-hidden drag-canvas flex items-center justify-center">
+        <!-- ズーム操作 -->
+        <div id="zoom-controls" class="absolute top-2 right-2 flex items-center gap-1.5 z-30 bg-zinc-900/90 border border-zinc-700 rounded-lg p-1 shadow-lg">
+          <button type="button" onclick="zoomIn()" class="w-8 h-8 bg-zinc-800 text-white rounded font-bold text-lg flex items-center justify-center active:bg-zinc-700">+</button>
+          <button type="button" onclick="zoomOut()" class="w-8 h-8 bg-zinc-800 text-white rounded font-bold text-lg flex items-center justify-center active:bg-zinc-700">−</button>
+          <button type="button" onclick="resetZoom()" class="px-2.5 h-8 bg-zinc-800 text-zinc-200 rounded text-xs font-semibold flex items-center justify-center active:bg-zinc-700">初期化</button>
+        </div>
+
+        <div id="pan-hint" class="absolute bottom-2 left-2 z-20 bg-black/75 border border-zinc-800 text-zinc-400 text-xs px-2.5 py-1 rounded-md pointer-events-none">
+          ドラッグ移動 / 2本指ピンチ拡大
+        </div>
+
+        <div id="zoom-stage" class="w-full h-full flex items-center justify-center origin-center will-change-transform pointer-events-none">
+          <canvas id="pdf-canvas" class="max-h-full max-w-full object-contain hidden pointer-events-none"></canvas>
+          <img id="image-preview" class="max-h-full max-w-full object-contain hidden pointer-events-none" alt="図面プレビュー">
+        </div>
+
+        <div id="preview-placeholder" class="absolute inset-0 flex flex-col items-center justify-center text-zinc-600 text-xs gap-1 text-center px-4 pointer-events-none">
+          <svg class="w-8 h-8 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+          図面を選択すると原寸プレビューが表示されます
+        </div>
+
+        <!-- AI解析中インジケータ -->
+        <div id="loading-overlay" class="absolute inset-0 bg-black/85 flex flex-col items-center justify-center gap-2 hidden z-40 p-4 text-center">
+          <div class="w-9 h-9 border-3 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
+          <p class="text-sm font-bold text-zinc-100" id="loading-title">Gemini AI が図面を解析中...</p>
+          <p class="text-xs text-zinc-400">全幅・最長・開口寸法を読取中</p>
         </div>
       </div>
 
-      <!-- 全幅（1行表示） -->
-      <div class="input-box" id="box-wallW" onclick="selectField('wallW')">
-        <div class="input-label">全幅</div>
-        <div class="input-val" id="val-wallW">10000</div>
-      </div>
+      <!-- 操作ボタン列 -->
+      <div class="flex flex-col gap-2 flex-none">
+        <div class="flex gap-2">
+          <button id="btn-open-crop" type="button" onclick="openCropModal()" disabled class="flex-1 h-11 bg-zinc-800 active:bg-zinc-700 disabled:bg-zinc-900 disabled:text-zinc-600 text-orange-400 text-sm font-bold rounded-xl flex items-center justify-center gap-1.5 shadow">
+            <span>✂ 読取範囲を切り抜く</span>
+          </button>
+          <button id="btn-reset-crop" type="button" onclick="resetToOriginalImage()" class="hidden h-11 px-4 bg-zinc-800 active:bg-zinc-700 text-zinc-300 text-sm font-semibold rounded-xl flex items-center justify-center gap-1">
+            <span>元に戻す</span>
+          </button>
+        </div>
 
-      <!-- 最長 & 働幅 -->
-      <div class="grid-row-2">
-        <div class="input-box" id="box-wallH" onclick="selectField('wallH')">
-          <div class="input-label">最長</div>
-          <div class="input-val" id="val-wallH">6000</div>
-        </div>
-        <div class="input-box active" id="box-pitch" onclick="selectField('pitch')">
-          <div class="input-label">働幅</div>
-          <div class="input-val" id="val-pitch">780</div>
-        </div>
-      </div>
-
-      <!-- 開口幅 & 開口高 -->
-      <div class="grid-row-2">
-        <div class="input-box" id="box-opW" onclick="selectField('opW')">
-          <div class="input-label">開口幅</div>
-          <div class="input-val" id="val-opW">0</div>
-        </div>
-        <div class="input-box" id="box-opH" onclick="selectField('opH')">
-          <div class="input-label">開口高</div>
-          <div class="input-val" id="val-opH">0</div>
-        </div>
-      </div>
-
-      <!-- 開口下 & 開口数 -->
-      <div class="grid-row-2">
-        <div class="input-box" id="box-opY" onclick="selectField('opY')">
-          <div class="input-label">開口下</div>
-          <div class="input-val" id="val-opY">0</div>
-        </div>
-        <div class="input-box" id="box-opCount" onclick="selectField('opCount')">
-          <div class="input-label">開口数</div>
-          <div class="input-val" id="val-opCount">0</div>
-        </div>
-      </div>
-
-      <!-- 材料取り内訳（寸法割付タブ専用） -->
-      <div class="summary-card">
-        <div class="summary-row">
-          <div class="sum-title">【結果】総必要枚数</div>
-          <div class="sum-val" style="color:var(--accent-blue); font-size:19px;" id="res-total-sheets">13 枚</div>
-        </div>
-        <div class="summary-row">
-          <div class="sum-title">最長部</div>
-          <div class="sum-val" id="res-full-info">L=6000mm × 13枚</div>
-        </div>
-        <div class="summary-row">
-          <div class="sum-title">開口部上</div>
-          <div class="sum-val" id="res-top-info">L=0mm × 0枚</div>
-        </div>
-        <div class="summary-row">
-          <div class="sum-title">開口部下</div>
-          <div class="sum-val" id="res-bot-info">L=0mm × 0枚</div>
+        <div class="flex gap-2">
+          <button id="btn-screenshot" type="button" onclick="saveScreenshot()" class="flex-1 h-12 bg-zinc-800 active:bg-zinc-700 text-zinc-100 text-sm font-bold rounded-xl flex items-center justify-center gap-1.5 shadow">
+            <svg class="w-4 h-4 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+            <span id="btn-screenshot-text">画面を画像保存</span>
+          </button>
+          <button id="btn-analyze" onclick="analyzeCurrentDocument()" disabled class="flex-1 h-12 bg-orange-600 active:bg-orange-700 disabled:bg-zinc-800 disabled:text-zinc-600 text-white text-sm font-bold rounded-xl flex items-center justify-center gap-1.5 shadow">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+            <span>AI自動読取</span>
+          </button>
         </div>
       </div>
     </div>
 
-    <!-- ② 面積計算タブ専用エリア（必要項目のみ表示・テンキー非表示） -->
-    <div id="section-area-tab" style="display: none; flex-direction: column; gap: 10px; padding-top: 4px;">
-      <!-- 一番上：全幅 × 最長 の全体面積 -->
-      <div class="area-total-card">
-        <div>
-          <div class="area-total-title">全幅 × 最長（全体面積）</div>
-          <div id="area-calc-formula" style="font-size:14px; color:var(--sub-text); margin-top:2px;">W 10000 × H 6000</div>
-        </div>
-        <div class="area-total-val" id="area-gross">60.00<span>㎡</span></div>
-      </div>
+    <!-- ============================================== -->
+    <!-- 画面2: 計算結果タブ（初期表示・手動入力対応） -->
+    <!-- ============================================== -->
+    <div id="view-calc" class="h-full flex flex-col p-3 gap-3 overflow-y-auto custom-scrollbar">
 
-      <div class="area-stat-grid">
-        <div class="area-stat-card" style="border: 2px solid var(--accent-blue); padding: 12px 10px;">
-          <div class="area-stat-title" style="font-size: 14px; color: var(--accent-blue); font-weight:700;">全体-開口部</div>
-          <div class="area-stat-val" id="area-net" style="font-size: 24px; color: var(--accent-blue); margin-top: 4px;">0.00<span>㎡</span></div>
+      <!-- 1. 面積サマリー（最上段） -->
+      <div class="grid grid-cols-3 gap-2 flex-none">
+        <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 flex flex-col justify-between">
+          <span class="text-xs font-bold text-zinc-400">全体面積</span>
+          <div class="text-base font-extrabold font-mono text-white mt-1" id="res-gross-area">0.00<span class="text-xs text-zinc-400 font-normal ml-0.5">㎡</span></div>
         </div>
-        <div class="area-stat-card" style="border: 2px solid var(--accent-green); padding: 12px 10px;">
-          <div class="area-stat-title" style="font-size: 14px; color: var(--accent-green); font-weight:700;">開口合計</div>
-          <div class="area-stat-val" id="area-op" style="font-size: 24px; color: var(--accent-green); margin-top: 4px;">0.00<span>㎡</span></div>
+        <div class="bg-zinc-900 border border-sky-500/50 rounded-xl p-2.5 flex flex-col justify-between">
+          <span class="text-xs font-bold text-sky-400">実面積 (外壁)</span>
+          <div class="text-base font-extrabold font-mono text-sky-400 mt-1" id="res-net-area">0.00<span class="text-xs text-zinc-400 font-normal ml-0.5">㎡</span></div>
         </div>
-      </div>
-
-      <div class="summary-card" style="padding: 12px 14px;">
-        <div style="font-size:15px; font-weight:700; color:#d4d4d8; margin-bottom:8px; border-bottom:1px solid #27272a; padding-bottom:6px;">
-          寸法違い 各1枚あたりの㎡
-        </div>
-        <div class="summary-row" style="padding: 8px 0;">
-          <div class="sum-title" style="font-size: 15px;">最長材 (1枚)</div>
-          <div class="sum-val" id="area-single-full" style="font-size: 17px; color: #ffffff;">0.000 ㎡</div>
-        </div>
-        <div class="summary-row" style="padding: 8px 0;">
-          <div class="sum-title" style="font-size: 15px;">開口上 (1枚)</div>
-          <div class="sum-val" id="area-single-top" style="font-size: 17px; color: #ffffff;">0.000 ㎡</div>
-        </div>
-        <div class="summary-row" style="padding: 8px 0;">
-          <div class="sum-title" style="font-size: 15px;">開口下 (1枚)</div>
-          <div class="sum-val" id="area-single-bot" style="font-size: 17px; color: #ffffff;">0.000 ㎡</div>
+        <div class="bg-zinc-900 border border-green-500/50 rounded-xl p-2.5 flex flex-col justify-between">
+          <span class="text-xs font-bold text-green-400">開口合計</span>
+          <div class="text-base font-extrabold font-mono text-green-400 mt-1" id="res-op-area">0.00<span class="text-xs text-zinc-400 font-normal ml-0.5">㎡</span></div>
         </div>
       </div>
 
-      <!-- 面積計算タブ内の保存済みデータ蓄積エリア -->
-      <div style="margin-top: 4px; display:flex; flex-direction:column; gap:8px;">
-        <div style="font-size: 14px; font-weight: 700; color: #a1a1aa; display:flex; justify-content:space-between; align-items:center;">
-          <span>保存済み 面積データ</span>
-          <span style="font-size: 14px; font-weight: 500; color: var(--sub-text);">※寸法割付保存時に自動記録</span>
+      <!-- 不足寸法の警告通知バナー -->
+      <div id="validation-alert" class="hidden bg-red-950/90 border-2 border-red-500 rounded-xl p-3 text-xs text-red-200 flex flex-col gap-1.5 flex-none">
+        <div class="flex items-center gap-1.5 font-bold text-red-400 text-sm">
+          <svg class="w-4 h-4 text-red-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+          <span>寸法情報が不足しているため計算を中断しています</span>
         </div>
-        <div id="area-history-list" style="display: flex; flex-direction: column; gap: 8px;"></div>
+        <ul id="validation-errors" class="list-disc list-inside space-y-0.5 text-xs text-red-300 pl-1"></ul>
       </div>
-    </div>
 
-    <!-- ③ 保存一覧表示エリア -->
-    <div id="section-history" style="display: none;">
-      <div id="history-list" style="display: flex; flex-direction: column; gap: 8px;"></div>
+      <!-- 2. 基本寸法設定カード（働幅・全幅・最長） -->
+      <div class="bg-zinc-900/90 border border-zinc-800 rounded-xl p-3 flex flex-col gap-2.5 flex-none shadow">
+        <div class="flex items-center justify-between pb-2 border-b border-zinc-800">
+          <span class="text-sm font-bold text-zinc-100">壁の基本寸法</span>
+          <div class="flex items-center gap-1.5">
+            <span class="text-xs font-semibold text-orange-400">働幅:</span>
+            <input type="number" inputmode="numeric" id="input-pitch" value="500" class="w-16 h-8 bg-black border border-zinc-700 px-1 text-white font-mono rounded-lg text-right text-sm font-bold focus:border-orange-500 outline-none" oninput="calculate()">
+            <span class="text-xs text-zinc-400">mm</span>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div class="bg-black/60 border border-zinc-800 rounded-xl p-2.5 flex flex-col justify-between">
+            <span class="text-xs font-bold text-zinc-400">全幅 (W)</span>
+            <div class="flex items-baseline justify-end gap-1 mt-1">
+              <input type="number" inputmode="numeric" id="input-wallW" value="20000" class="w-full bg-transparent text-right font-mono font-extrabold text-white text-lg outline-none" oninput="calculate()" placeholder="mm">
+              <span class="text-xs text-zinc-400 font-normal">mm</span>
+            </div>
+          </div>
+          <div class="bg-black/60 border border-zinc-800 rounded-xl p-2.5 flex flex-col justify-between">
+            <span class="text-xs font-bold text-zinc-400">最長 (H)</span>
+            <div class="flex items-baseline justify-end gap-1 mt-1">
+              <input type="number" inputmode="numeric" id="input-wallH" value="11000" class="w-full bg-transparent text-right font-mono font-extrabold text-white text-lg outline-none" oninput="calculate()" placeholder="mm">
+              <span class="text-xs text-zinc-400 font-normal">mm</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. 開口部リストカード（途切れ・見切れを根絶した2段構造） -->
+      <div class="bg-zinc-900/90 border border-zinc-800 rounded-xl p-3 flex flex-col gap-2 flex-none shadow">
+        <div class="flex justify-between items-center pb-2 border-b border-zinc-800">
+          <span class="text-sm font-bold text-zinc-100">開口部リスト (<span id="opening-count">0</span>箇所)</span>
+          <button type="button" onclick="addOpeningRow()" class="text-xs font-bold text-orange-400 bg-orange-950/60 border border-orange-800/80 px-2.5 py-1 rounded-lg active:scale-95">
+            + 開口を追加
+          </button>
+        </div>
+
+        <!-- 開口リストコンテナ -->
+        <div id="openings-container" class="flex flex-col gap-2"></div>
+      </div>
+
+      <!-- 4. 材料取り結果カード -->
+      <div class="bg-zinc-900 border border-orange-500/80 rounded-xl p-3 flex flex-col gap-2 flex-none shadow">
+        <div class="flex justify-between items-center pb-2 border-b border-zinc-800">
+          <span class="text-sm font-bold text-zinc-200">【結果】総必要枚数</span>
+          <span class="font-extrabold text-sky-400 font-mono text-2xl" id="res-total-sheets">0 枚</span>
+        </div>
+        <div class="flex justify-between items-center py-0.5">
+          <span class="text-xs font-medium text-zinc-400">最長部</span>
+          <span class="font-mono font-bold text-zinc-100 text-sm" id="res-full-info">L=0mm × 0枚</span>
+        </div>
+        <div class="flex flex-col gap-0.5 py-0.5">
+          <span class="text-xs font-medium text-zinc-400">開口部上</span>
+          <span class="font-mono font-bold text-zinc-100 text-sm text-right leading-tight" id="res-top-info">0枚</span>
+        </div>
+        <div class="flex flex-col gap-0.5 py-0.5">
+          <span class="text-xs font-medium text-yellow-400">開口部間 (中間壁)</span>
+          <span class="font-mono font-bold text-yellow-300 text-sm text-right leading-tight" id="res-mid-info">0枚</span>
+        </div>
+        <div class="flex flex-col gap-0.5 py-0.5">
+          <span class="text-xs font-medium text-zinc-400">開口部下</span>
+          <span class="font-mono font-bold text-zinc-100 text-sm text-right leading-tight" id="res-bot-info">0枚</span>
+        </div>
+      </div>
+
+      <!-- 5. 控えコピーボタン -->
+      <button type="button" onclick="copyResults()" class="h-12 bg-zinc-800 active:bg-zinc-700 text-zinc-200 text-sm font-bold rounded-xl flex items-center justify-center gap-2 flex-none shadow">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
+        <span>計算結果をクリップボードにコピー</span>
+      </button>
+
     </div>
   </main>
 
-  <footer id="main-footer">
-    <div class="keypad">
-      <button class="key-btn" onclick="pressKey('7')">7</button>
-      <button class="key-btn" onclick="pressKey('8')">8</button>
-      <button class="key-btn" onclick="pressKey('9')">9</button>
+  <!-- iPhone専用 下部タブバー（初期選択は「計算結果」） -->
+  <nav class="fixed bottom-0 left-0 right-0 z-40 bg-zinc-950/95 backdrop-blur-lg border-t border-zinc-800 flex justify-around items-center" style="height: calc(56px + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom);">
+    <button id="tab-btn-drawing" type="button" onclick="switchTab('drawing')" class="flex-1 py-1.5 flex flex-col items-center justify-center gap-1 text-zinc-400 font-semibold transition-colors">
+      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+      <span class="text-xs">図面・操作</span>
+    </button>
+    <div class="w-px h-7 bg-zinc-800"></div>
+    <button id="tab-btn-calc" type="button" onclick="switchTab('calc')" class="flex-1 py-1.5 flex flex-col items-center justify-center gap-1 text-orange-400 font-bold transition-colors">
+      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+      <span class="text-xs">計算結果</span>
+    </button>
+  </nav>
 
-      <button class="key-btn" onclick="pressKey('4')">4</button>
-      <button class="key-btn" onclick="pressKey('5')">5</button>
-      <button class="key-btn" onclick="pressKey('6')">6</button>
-
-      <button class="key-btn" onclick="pressKey('1')">1</button>
-      <button class="key-btn" onclick="pressKey('2')">2</button>
-      <button class="key-btn" onclick="pressKey('3')">3</button>
-
-      <button class="key-btn" onclick="pressKey('0')">0</button>
-      <button class="key-btn" onclick="pressKey('00')">00</button>
-      <button class="key-btn" onclick="pressKey('.')">.</button>
-
-      <button class="key-btn del" onclick="pressBack()">⌫</button>
-      <button class="key-btn action" onclick="clearField()">クリア</button>
-      <button class="key-btn save" onclick="openSaveModal()">保存</button>
+  <!-- 切り抜き専用全画面モーダル -->
+  <div id="crop-modal" class="fixed inset-0 bg-black/95 backdrop-blur-md hidden z-50 flex flex-col p-3" style="padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom);">
+    <div class="flex-none flex items-center justify-between pb-2 border-b border-zinc-800">
+      <h3 class="text-sm font-bold text-white flex items-center gap-1.5">
+        <span class="text-orange-500">✂</span> 読取範囲の切り抜き
+      </h3>
+      <div class="flex items-center gap-2">
+        <button type="button" onclick="closeCropModal()" class="px-3 py-1.5 text-xs text-zinc-300 bg-zinc-800 rounded-lg active:bg-zinc-700">キャンセル</button>
+        <button type="button" onclick="applyCrop()" class="px-4 py-1.5 text-xs font-bold text-white bg-orange-600 rounded-lg active:bg-orange-700">✓ 決定</button>
+      </div>
     </div>
-  </footer>
+    <div class="flex-1 min-h-0 bg-zinc-950 rounded-xl border border-zinc-800 mt-2 relative overflow-hidden flex items-center justify-center p-2">
+      <img id="crop-source-img" class="max-h-full max-w-full block" alt="切り抜き対象">
+    </div>
+  </div>
 
-  <!-- タイトル入力用モーダル -->
-  <div class="modal-backdrop" id="save-modal">
-    <div class="modal-box">
-      <h3>保存タイトルの入力</h3>
-      <input type="text" id="save-title-input" placeholder="例: 〇〇邸 西面外壁" maxlength="30">
-      <div class="btn-row">
-        <button class="modal-btn cancel" onclick="closeSaveModal()">キャンセル</button>
-        <button class="modal-btn confirm" onclick="confirmSave()">保存する</button>
+  <!-- APIキー設定モーダル -->
+  <div id="api-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
+    <div class="bg-zinc-900 border border-zinc-700 rounded-2xl max-w-sm w-full p-4 flex flex-col gap-3 shadow-2xl">
+      <div class="flex items-center justify-between pb-2 border-b border-zinc-800">
+        <h3 class="text-sm font-bold text-white flex items-center gap-1.5">
+          <span>🔑</span> Gemini APIキー設定
+        </h3>
+        <button onclick="closeApiKeyModal()" class="text-zinc-400 hover:text-white text-lg p-1">✕</button>
+      </div>
+      <p class="text-xs text-zinc-300 leading-relaxed">
+        Google AI Studioで取得した無料のAPIキーを入力してください。
+      </p>
+      <input type="password" id="input-api-key" placeholder="AIzaSy..." class="w-full bg-black border border-zinc-700 rounded-xl px-3 py-2 text-white font-mono text-sm focus:border-orange-500 outline-none">
+      <div class="flex gap-2 justify-end mt-1">
+        <button onclick="clearApiKey()" class="px-3 py-1.5 text-xs text-zinc-400 bg-zinc-800 rounded-lg">クリア</button>
+        <button onclick="saveApiKey()" class="px-4 py-1.5 text-xs font-bold text-white bg-orange-600 rounded-lg active:bg-orange-700">保存して閉じる</button>
       </div>
     </div>
   </div>
 
-  <div id="toast">保存しました</div>
+  <!-- 画像保存用モーダル -->
+  <div id="image-modal" class="fixed inset-0 bg-black/90 backdrop-blur-md hidden z-50 flex items-center justify-center p-4">
+    <div class="bg-zinc-900 border border-zinc-700 rounded-2xl max-w-md w-full max-h-[90vh] p-4 flex flex-col gap-2.5 shadow-2xl">
+      <div class="flex items-center justify-between pb-2 border-b border-zinc-800">
+        <h3 class="text-sm font-bold text-white flex items-center gap-1.5">
+          <span class="text-green-400">✓</span> スクリーンショット作成完了
+        </h3>
+        <button onclick="closeImageModal()" class="text-zinc-400 hover:text-white text-lg p-1">✕</button>
+      </div>
+      <p class="text-xs text-zinc-300">
+        画像を長押しして「<span class="text-orange-400 font-bold">写真に追加</span>」を選択してください。
+      </p>
+      <div class="flex-1 overflow-auto bg-black rounded-xl p-1 border border-zinc-800 flex items-center justify-center min-h-[180px] max-h-[60vh]">
+        <img id="screenshot-preview-img" class="max-w-full max-h-full object-contain rounded-lg" alt="プレビュー">
+      </div>
+      <div class="flex gap-2 justify-end pt-1">
+        <a id="btn-modal-download" download="材料計算結果.png" class="px-4 py-2 text-xs font-bold text-white bg-sky-600 rounded-lg">直接保存</a>
+        <button onclick="closeImageModal()" class="px-4 py-2 text-xs font-semibold text-zinc-300 bg-zinc-800 rounded-lg">閉じる</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- トースト通知 -->
+  <div id="toast" class="fixed top-4 left-1/2 -translate-x-1/2 bg-zinc-800/95 border border-zinc-600 text-white text-xs font-semibold px-4 py-2 rounded-full opacity-0 pointer-events-none transition-opacity duration-200 z-50 shadow-2xl max-w-[90vw] text-center"></div>
 
   <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js')
-          .then((registration) => {
-            console.log('ServiceWorker registration successful with scope: ', registration.scope);
-          })
-          .catch((err) => {
-            console.log('ServiceWorker registration failed: ', err);
-          });
-      });
+    let currentBase64Image = null;
+    let currentImageMimeType = 'image/png';
+    let originalBase64Image = null;
+    let originalImageMimeType = 'image/png';
+    let savedApiKey = localStorage.getItem('kyowa_gemini_api_key') || '';
+    let cropperInstance = null;
+
+    // 開口部初期データ（サンプル）
+    let openingsData = [
+      { id: 1, x: 2000, w: 3000, h: 3500, y: 0, count: 1, label: '下段開口(大)' },
+      { id: 2, x: 3000, w: 1500, h: 2000, y: 7500, count: 1, label: '上段開口(窓)' },
+      { id: 3, x: 7000, w: 2500, h: 3000, y: 2500, count: 1, label: '右側開口' }
+    ];
+
+    // ==========================================
+    // タブ切替（iPhone画面最適化）
+    // ==========================================
+    function switchTab(tab) {
+      const viewDrawing = document.getElementById('view-drawing');
+      const viewCalc = document.getElementById('view-calc');
+      const btnDrawing = document.getElementById('tab-btn-drawing');
+      const btnCalc = document.getElementById('tab-btn-calc');
+
+      if (tab === 'drawing') {
+        viewDrawing.classList.remove('hidden');
+        viewDrawing.classList.add('flex');
+        viewCalc.classList.add('hidden');
+        viewCalc.classList.remove('flex');
+        btnDrawing.className = 'flex-1 py-1.5 flex flex-col items-center justify-center gap-1 text-orange-400 font-bold transition-colors';
+        btnCalc.className = 'flex-1 py-1.5 flex flex-col items-center justify-center gap-1 text-zinc-400 font-semibold transition-colors';
+      } else {
+        viewDrawing.classList.add('hidden');
+        viewDrawing.classList.remove('flex');
+        viewCalc.classList.remove('hidden');
+        viewCalc.classList.add('flex');
+        btnDrawing.className = 'flex-1 py-1.5 flex flex-col items-center justify-center gap-1 text-zinc-400 font-semibold transition-colors';
+        btnCalc.className = 'flex-1 py-1.5 flex flex-col items-center justify-center gap-1 text-orange-400 font-bold transition-colors';
+      }
     }
 
-    const state = {
-      mode: 'dim',
-      activeField: 'pitch',
-      isOverwrite: true, // 入力欄選択直後の上書きフラグ
-      values: {
-        wallW: '10000',
-        wallH: '6000',
-        pitch: '780',
-        opCount: '0',
-        opW: '0',
-        opH: '0',
-        opY: '0'
+    // ==========================================
+    // 入力欄タップ時に即座に「全選択」する処理（上書き入力対応）
+    // ==========================================
+    document.addEventListener('focusin', (e) => {
+      if (e.target && e.target.tagName === 'INPUT' && (e.target.type === 'number' || e.target.type === 'text' || e.target.type === 'password')) {
+        e.target.select();
+        setTimeout(() => {
+          try {
+            e.target.select();
+            if (e.target.setSelectionRange) {
+              e.target.setSelectionRange(0, 9999);
+            }
+          } catch (_) {}
+        }, 50);
       }
-    };
+    });
 
-    const MODES = ['dim', 'area', 'hist'];
+    // ==========================================
+    // ズーム・パン処理
+    // ==========================================
+    let zoomScale = 1.0;
+    let panX = 0;
+    let panY = 0;
+    let isDragging = false;
+    let dragStartX = 0;
+    let dragStartY = 0;
+    let touchStartDist = 0;
+    let touchStartScale = 1.0;
 
-    // オフライン対応 IndexedDB 初期化
-    const DB_NAME = 'BankinCalcDB';
-    const STORE_NAME = 'calculations';
-    let dbInstance = null;
+    const zoomStage = document.getElementById('zoom-stage');
+    const previewWrapper = document.getElementById('preview-wrapper');
 
-    function initDB() {
-      return new Promise((resolve, reject) => {
-        const req = indexedDB.open(DB_NAME, 1);
-        req.onupgradeneeded = (e) => {
-          const db = e.target.result;
-          if (!db.objectStoreNames.contains(STORE_NAME)) {
-            db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
+    function updateTransform() {
+      if (!zoomStage) return;
+      zoomStage.style.transform = `translate(${panX}px, ${panY}px) scale(${zoomScale})`;
+    }
+
+    function zoomIn() {
+      zoomScale = Math.min(zoomScale * 1.3, 10.0);
+      updateTransform();
+    }
+
+    function zoomOut() {
+      zoomScale = Math.max(zoomScale / 1.3, 0.3);
+      updateTransform();
+    }
+
+    function resetZoom() {
+      zoomScale = 1.0;
+      panX = 0;
+      panY = 0;
+      updateTransform();
+    }
+
+    previewWrapper.addEventListener('touchstart', (e) => {
+      if (e.target.closest('#zoom-controls')) return;
+      if (e.touches.length === 1) {
+        isDragging = true;
+        dragStartX = e.touches[0].clientX - panX;
+        dragStartY = e.touches[0].clientY - panY;
+      } else if (e.touches.length === 2) {
+        isDragging = false;
+        touchStartDist = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY
+        );
+        touchStartScale = zoomScale;
+      }
+    }, { passive: false });
+
+    previewWrapper.addEventListener('touchmove', (e) => {
+      if (e.touches.length === 1 && isDragging) {
+        e.preventDefault();
+        panX = e.touches[0].clientX - dragStartX;
+        panY = e.touches[0].clientY - dragStartY;
+        updateTransform();
+      } else if (e.touches.length === 2 && touchStartDist > 0) {
+        e.preventDefault();
+        const dist = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY
+        );
+        zoomScale = Math.min(Math.max(touchStartScale * (dist / touchStartDist), 0.3), 10.0);
+        updateTransform();
+      }
+    }, { passive: false });
+
+    previewWrapper.addEventListener('touchend', (e) => {
+      if (e.touches.length === 0) {
+        isDragging = false;
+        touchStartDist = 0;
+      } else if (e.touches.length === 1) {
+        touchStartDist = 0;
+        isDragging = true;
+        dragStartX = e.touches[0].clientX - panX;
+        dragStartY = e.touches[0].clientY - panY;
+      }
+    });
+
+    // ==========================================
+    // 切り抜き（トリミング）機能
+    // ==========================================
+    function openCropModal() {
+      if (!currentBase64Image) {
+        showToast('先に図面をアップロードしてください');
+        return;
+      }
+      const modal = document.getElementById('crop-modal');
+      const cropImg = document.getElementById('crop-source-img');
+      cropImg.src = `data:${currentImageMimeType};base64,${currentBase64Image}`;
+      modal.classList.remove('hidden');
+
+      if (cropperInstance) {
+        cropperInstance.destroy();
+        cropperInstance = null;
+      }
+      setTimeout(() => {
+        cropperInstance = new Cropper(cropImg, {
+          viewMode: 1,
+          dragMode: 'move',
+          autoCropArea: 0.85,
+          restore: false,
+          guides: true,
+          center: true,
+          highlight: true,
+          cropBoxMovable: true,
+          cropBoxResizable: true,
+          toggleDragModeOnDblclick: false,
+        });
+      }, 100);
+    }
+
+    function closeCropModal() {
+      document.getElementById('crop-modal').classList.add('hidden');
+      if (cropperInstance) {
+        cropperInstance.destroy();
+        cropperInstance = null;
+      }
+    }
+
+    function applyCrop() {
+      if (!cropperInstance) return;
+      const croppedCanvas = cropperInstance.getCroppedCanvas({ imageSmoothingEnabled: false });
+      if (!croppedCanvas) {
+        showToast('切り抜き範囲の取得に失敗しました');
+        return;
+      }
+      const croppedDataUrl = croppedCanvas.toDataURL('image/png');
+      currentBase64Image = croppedDataUrl.split(',')[1];
+      currentImageMimeType = 'image/png';
+
+      const imgPreview = document.getElementById('image-preview');
+      imgPreview.src = croppedDataUrl;
+      imgPreview.classList.remove('hidden');
+      document.getElementById('pdf-canvas').classList.add('hidden');
+      document.getElementById('preview-placeholder').classList.add('hidden');
+
+      document.getElementById('btn-reset-crop').classList.remove('hidden');
+      closeCropModal();
+      resetZoom();
+      showToast('範囲を切り抜きました。「AI自動読取」を押してください');
+    }
+
+    function resetToOriginalImage() {
+      if (!originalBase64Image) return;
+      currentBase64Image = originalBase64Image;
+      currentImageMimeType = originalImageMimeType;
+      const originalDataUrl = `data:${originalImageMimeType};base64,${originalBase64Image}`;
+
+      const imgPreview = document.getElementById('image-preview');
+      imgPreview.src = originalDataUrl;
+      imgPreview.classList.remove('hidden');
+      document.getElementById('pdf-canvas').classList.add('hidden');
+
+      document.getElementById('btn-reset-crop').classList.add('hidden');
+      resetZoom();
+      showToast('元の全体図面に戻しました');
+    }
+
+    // ==========================================
+    // APIキー管理
+    // ==========================================
+    function openApiKeyModal() {
+      document.getElementById('input-api-key').value = savedApiKey;
+      document.getElementById('api-modal').classList.remove('hidden');
+    }
+
+    function closeApiKeyModal() {
+      document.getElementById('api-modal').classList.add('hidden');
+    }
+
+    function saveApiKey() {
+      const val = document.getElementById('input-api-key').value.trim();
+      if (!val) {
+        showToast('キーを入力してください');
+        return;
+      }
+      savedApiKey = val;
+      localStorage.setItem('kyowa_gemini_api_key', val);
+      updateApiKeyUI();
+      closeApiKeyModal();
+      showToast('APIキーを保存しました');
+    }
+
+    function clearApiKey() {
+      document.getElementById('input-api-key').value = '';
+      savedApiKey = '';
+      localStorage.removeItem('kyowa_gemini_api_key');
+      updateApiKeyUI();
+      closeApiKeyModal();
+      showToast('APIキーを解除しました');
+    }
+
+    function updateApiKeyUI() {
+      const label = document.getElementById('label-api-status');
+      const btn = document.getElementById('btn-api-key');
+      if (!label || !btn) return;
+      if (savedApiKey) {
+        label.textContent = 'API設定済';
+        btn.classList.add('border-green-500', 'text-green-400');
+      } else {
+        label.textContent = 'API設定';
+        btn.classList.remove('border-green-500', 'text-green-400');
+      }
+    }
+
+    // ==========================================
+    // ファイル読み込み処理
+    // ==========================================
+    const fileInput = document.getElementById('file-input');
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files && e.target.files.length > 0) {
+        handleFile(e.target.files[0]);
+      }
+    });
+
+    async function handleFile(file) {
+      if (!file) return;
+
+      document.getElementById('drop-prompt').classList.add('hidden');
+      const fileInfo = document.getElementById('file-info');
+      fileInfo.textContent = `読込完了: ${file.name}`;
+      fileInfo.classList.remove('hidden');
+
+      document.getElementById('btn-analyze').disabled = false;
+      document.getElementById('btn-open-crop').disabled = false;
+      document.getElementById('btn-reset-crop').classList.add('hidden');
+
+      showToast('図面を展開中...');
+
+      if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+        const fileReader = new FileReader();
+        fileReader.onload = async function() {
+          try {
+            const typedarray = new Uint8Array(this.result);
+            const pdf = await pdfjsLib.getDocument({ data: typedarray }).promise;
+            const page = await pdf.getPage(1);
+            const unscaled = page.getViewport({ scale: 1.0 });
+            let scale = Math.min(Math.max(4000 / unscaled.width, 3.0), 6.0);
+            const viewport = page.getViewport({ scale: scale });
+
+            const canvas = document.getElementById('pdf-canvas');
+            const context = canvas.getContext('2d', { alpha: false });
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+            context.fillStyle = '#ffffff';
+            context.fillRect(0, 0, canvas.width, canvas.height);
+
+            await page.render({ canvasContext: context, viewport: viewport, intent: 'print' }).promise;
+            canvas.classList.remove('hidden');
+            document.getElementById('image-preview').classList.add('hidden');
+            document.getElementById('preview-placeholder').classList.add('hidden');
+
+            const fullPngUrl = canvas.toDataURL('image/png');
+            const base64 = fullPngUrl.split(',')[1];
+            currentBase64Image = base64;
+            currentImageMimeType = 'image/png';
+            originalBase64Image = base64;
+            originalImageMimeType = 'image/png';
+
+            resetZoom();
+            showToast('PDFを展開しました');
+          } catch (err) {
+            console.error(err);
+            showToast('PDFの展開に失敗しました');
           }
         };
-        req.onsuccess = (e) => {
-          dbInstance = e.target.result;
-          resolve(dbInstance);
+        fileReader.readAsArrayBuffer(file);
+      } else if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const rawDataUrl = e.target.result;
+          const mimeType = rawDataUrl.substring(5, rawDataUrl.indexOf(';'));
+          const base64 = rawDataUrl.split(',')[1];
+
+          currentBase64Image = base64;
+          currentImageMimeType = mimeType;
+          originalBase64Image = base64;
+          originalImageMimeType = mimeType;
+
+          const imgPreview = document.getElementById('image-preview');
+          imgPreview.src = rawDataUrl;
+          imgPreview.classList.remove('hidden');
+          document.getElementById('pdf-canvas').classList.add('hidden');
+          document.getElementById('preview-placeholder').classList.add('hidden');
+
+          resetZoom();
+          showToast('画像を読み込みました');
         };
-        req.onerror = (e) => reject(e);
+        reader.readAsDataURL(file);
+      }
+    }
+
+    // ==========================================
+    // Gemini AI 自動読取処理
+    // ==========================================
+    async function analyzeCurrentDocument() {
+      if (!currentBase64Image) {
+        showToast('図面ファイルを選択してください');
+        return;
+      }
+
+      const overlay = document.getElementById('loading-overlay');
+      overlay.classList.remove('hidden');
+
+      const apiKey = savedApiKey || "";
+      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+
+      const systemPrompt = `あなたは建築外壁・板金積算の専門エキスパートです。
+提供された高精細な建築立面図・図面からミリメートル(mm)の寸法数値を厳密に抽出しJSONで返してください。
+1. wallW: 全幅(mm)
+2. wallH: 壁の最長・高さ(mm)
+3. openings: 開口部リスト(label, leftX, width, height, bottomY, count)
+   - label: 「開口1(シャッター)」「開口2(窓)」のように日本語で名称を付けてください。
+   - leftX: 壁左端からの水平距離(mm)
+   - 地面に接する開口は bottomY = 0`;
+
+      const payload = {
+        contents: [
+          {
+            role: "user",
+            parts: [
+              { text: "この図面から全幅(wallW)、高さ(wallH)、開口部リスト(label, leftX, width, height, bottomY, count)を抽出してJSONで返してください。" },
+              { inlineData: { mimeType: currentImageMimeType, data: currentBase64Image } }
+            ]
+          }
+        ],
+        systemInstruction: { parts: [{ text: systemPrompt }] },
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: "OBJECT",
+            properties: {
+              wallW: { type: "INTEGER" },
+              wallH: { type: "INTEGER" },
+              openings: {
+                type: "ARRAY",
+                items: {
+                  type: "OBJECT",
+                  properties: {
+                    label: { type: "STRING" },
+                    leftX: { type: "INTEGER" },
+                    width: { type: "INTEGER" },
+                    height: { type: "INTEGER" },
+                    bottomY: { type: "INTEGER" },
+                    count: { type: "INTEGER" }
+                  },
+                  required: ["label", "leftX", "width", "height", "bottomY", "count"]
+                }
+              }
+            },
+            required: ["wallW", "wallH"]
+          }
+        }
+      };
+
+      try {
+        const response = await fetch(apiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+          if (response.status === 403 || response.status === 401) {
+            openApiKeyModal();
+            throw new Error('APIキーが必要です。右上の「API設定」から入力してください');
+          }
+          throw new Error('通信エラーが発生しました');
+        }
+
+        const data = await response.json();
+        const jsonText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!jsonText) throw new Error('AIからの応答データが空でした');
+
+        const parsed = JSON.parse(jsonText);
+        applyExtractedData(parsed);
+
+        // AI読取完了後に自動で「計算結果」タブへ切り替え
+        switchTab('calc');
+        showToast('AI自動読取が完了しました！');
+      } catch (err) {
+        console.error(err);
+        showToast(err.message || 'AI読取に失敗しました');
+      } finally {
+        overlay.classList.add('hidden');
+      }
+    }
+
+    function applyExtractedData(data) {
+      if (data.wallW) document.getElementById('input-wallW').value = data.wallW;
+      if (data.wallH) document.getElementById('input-wallH').value = data.wallH;
+
+      if (data.openings && Array.isArray(data.openings) && data.openings.length > 0) {
+        openingsData = data.openings.map((op, idx) => ({
+          id: Date.now() + idx,
+          x: op.leftX || 0,
+          w: op.width || 0,
+          h: op.height || 0,
+          y: op.bottomY || 0,
+          count: op.count || 1,
+          label: op.label || `開口${idx + 1}`
+        }));
+      }
+      renderOpenings();
+      calculate();
+    }
+
+    // ==========================================
+    // 開口部行の描画（iPhone用 2段レイアウトで文字切れ根絶）
+    // ==========================================
+    function renderOpenings() {
+      const container = document.getElementById('openings-container');
+      container.innerHTML = '';
+      document.getElementById('opening-count').textContent = openingsData.length;
+
+      openingsData.forEach((op, idx) => {
+        const card = document.createElement('div');
+        card.className = 'bg-black/60 border border-zinc-800 rounded-xl p-2.5 flex flex-col gap-2';
+        card.innerHTML = `
+          <!-- 上段: 名称（省略せず全表示）と削除ボタン -->
+          <div class="flex items-center justify-between pb-1.5 border-b border-zinc-800/80">
+            <span class="text-xs font-bold text-zinc-200">${escapeHtml(op.label)}</span>
+            <button type="button" onclick="removeOpeningRow(${idx})" class="text-xs text-zinc-400 active:text-red-400 px-2 py-0.5 rounded bg-zinc-900 border border-zinc-800">削除</button>
+          </div>
+
+          <!-- 下段: 4つの入力枠（X, W, H, 下）を均等4分割 -->
+          <div class="grid grid-cols-4 gap-1.5">
+            <div class="flex flex-col gap-0.5">
+              <span class="text-[11px] font-semibold text-zinc-400 text-center">X (左端距離)</span>
+              <input type="number" inputmode="numeric" value="${op.x || 0}" class="h-9 bg-zinc-900 border border-zinc-700 rounded-lg text-white font-mono text-center font-bold text-sm focus:border-orange-500 outline-none" oninput="updateOpening(${idx}, 'x', this.value)">
+            </div>
+            <div class="flex flex-col gap-0.5">
+              <span class="text-[11px] font-semibold text-zinc-400 text-center">W (幅)</span>
+              <input type="number" inputmode="numeric" value="${op.w}" class="h-9 bg-zinc-900 border border-zinc-700 rounded-lg text-white font-mono text-center font-bold text-sm focus:border-orange-500 outline-none" oninput="updateOpening(${idx}, 'w', this.value)">
+            </div>
+            <div class="flex flex-col gap-0.5">
+              <span class="text-[11px] font-semibold text-zinc-400 text-center">H (高さ)</span>
+              <input type="number" inputmode="numeric" value="${op.h}" class="h-9 bg-zinc-900 border border-zinc-700 rounded-lg text-white font-mono text-center font-bold text-sm focus:border-orange-500 outline-none" oninput="updateOpening(${idx}, 'h', this.value)">
+            </div>
+            <div class="flex flex-col gap-0.5">
+              <span class="text-[11px] font-semibold text-zinc-400 text-center">下 (下端高)</span>
+              <input type="number" inputmode="numeric" value="${op.y}" class="h-9 bg-zinc-900 border border-zinc-700 rounded-lg text-white font-mono text-center font-bold text-sm focus:border-orange-500 outline-none" oninput="updateOpening(${idx}, 'y', this.value)">
+            </div>
+          </div>
+        `;
+        container.appendChild(card);
       });
     }
 
-    function setMode(mode) {
-      state.mode = mode;
-      const tabDim = document.getElementById('tab-dim');
-      const tabArea = document.getElementById('tab-area');
-      const tabHist = document.getElementById('tab-hist');
-      const secDimTab = document.getElementById('section-dim-tab');
-      const secAreaTab = document.getElementById('section-area-tab');
-      const secHist = document.getElementById('section-history');
-      const footer = document.getElementById('main-footer');
-
-      tabDim.classList.remove('active');
-      tabArea.classList.remove('active');
-      tabHist.classList.remove('active');
-
-      if (mode === 'dim') {
-        tabDim.classList.add('active');
-        secDimTab.style.display = 'flex';
-        secAreaTab.style.display = 'none';
-        secHist.style.display = 'none';
-        footer.style.display = 'block'; // テンキー表示
-        selectField(state.activeField || 'wallW');
-      } else if (mode === 'area') {
-        tabArea.classList.add('active');
-        secDimTab.style.display = 'none';
-        secAreaTab.style.display = 'flex';
-        secHist.style.display = 'none';
-        footer.style.display = 'none'; // 自動計算のためテンキー非表示
-        loadAreaHistoryList();
-      } else if (mode === 'hist') {
-        tabHist.classList.add('active');
-        secDimTab.style.display = 'none';
-        secAreaTab.style.display = 'none';
-        secHist.style.display = 'flex';
-        footer.style.display = 'none'; // 保存一覧ではテンキー非表示
-        loadHistoryList();
-      }
+    function updateOpening(idx, field, val) {
+      openingsData[idx][field] = parseFloat(val) || 0;
       calculate();
     }
 
-    let touchStartX = 0;
-    let touchStartY = 0;
+    function addOpeningRow() {
+      openingsData.push({
+        id: Date.now(),
+        x: 0,
+        w: 8500,
+        h: 4100,
+        y: 0,
+        count: 1,
+        label: `開口${openingsData.length + 1}`
+      });
+      renderOpenings();
+      calculate();
+    }
 
-    window.addEventListener('touchstart', (e) => {
-      touchStartX = e.touches[0].clientX;
-      touchStartY = e.touches[0].clientY;
-    }, { passive: true });
+    function removeOpeningRow(idx) {
+      openingsData.splice(idx, 1);
+      renderOpenings();
+      calculate();
+    }
 
-    window.addEventListener('touchend', (e) => {
-      const touchEndX = e.changedTouches[0].clientX;
-      const touchEndY = e.changedTouches[0].clientY;
-      const diffX = touchEndX - touchStartX;
-      const diffY = touchEndY - touchStartY;
+    // ==========================================
+    // バリデーションと現場最適計算
+    // ==========================================
+    function validateInputs(Pitch, W, H, openings) {
+      const errors = [];
+      if (!W || W <= 0) errors.push('【全幅 (W)】が未入力または 0 です。');
+      if (!H || H <= 0) errors.push('【最長 (H)】が未入力または 0 です。');
+      if (!Pitch || Pitch <= 0) errors.push('【働幅】が未入力または 0 です。');
 
-      // 縦スクロールと誤認しないように横移動が大きい場合のみ判定 (50px以上)
-      if (Math.abs(diffX) > 50 && Math.abs(diffX) > Math.abs(diffY) * 1.5) {
-        const currIdx = MODES.indexOf(state.mode);
-        if (diffX < 0 && currIdx < MODES.length - 1) {
-          setMode(MODES[currIdx + 1]);
-        } else if (diffX > 0 && currIdx > 0) {
-          setMode(MODES[currIdx - 1]);
+      openings.forEach((op, i) => {
+        const name = op.label || `開口${i + 1}`;
+        if (!op.w || op.w <= 0) errors.push(`【${name}】の幅 (W) が未入力または 0 です。`);
+        if (!op.h || op.h <= 0) errors.push(`【${name}】の高さ (H) が未入力または 0 です。`);
+        if (W > 0 && (op.x + op.w) > W) errors.push(`【${name}】が壁の右端を超えています。`);
+        if (H > 0 && (op.y + op.h) > H) errors.push(`【${name}】が壁の上端を超えています。`);
+      });
+      return errors;
+    }
+
+    function calculate() {
+      const Pitch = parseFloat(document.getElementById('input-pitch').value) || 0;
+      const W = parseFloat(document.getElementById('input-wallW').value) || 0;
+      const H = parseFloat(document.getElementById('input-wallH').value) || 0;
+
+      const validationErrors = validateInputs(Pitch, W, H, openingsData);
+      const alertBox = document.getElementById('validation-alert');
+      const errorList = document.getElementById('validation-errors');
+
+      if (validationErrors.length > 0) {
+        errorList.innerHTML = validationErrors.map(err => `<li>${escapeHtml(err)}</li>`).join('');
+        alertBox.classList.remove('hidden');
+        document.getElementById('res-total-sheets').textContent = '入力エラー';
+        document.getElementById('res-full-info').textContent = '---';
+        document.getElementById('res-top-info').textContent = '---';
+        document.getElementById('res-mid-info').textContent = '---';
+        document.getElementById('res-bot-info').textContent = '---';
+        document.getElementById('res-gross-area').innerHTML = `0.00<span class="text-xs text-zinc-400 font-normal ml-0.5">㎡</span>`;
+        document.getElementById('res-net-area').innerHTML = `0.00<span class="text-xs text-zinc-400 font-normal ml-0.5">㎡</span>`;
+        document.getElementById('res-op-area').innerHTML = `0.00<span class="text-xs text-zinc-400 font-normal ml-0.5">㎡</span>`;
+        return;
+      }
+
+      alertBox.classList.add('hidden');
+
+      const totalSheets = Math.ceil(W / Pitch);
+      let totalOpM2Raw = 0;
+      openingsData.forEach(op => {
+        if (op.w > 0 && op.h > 0) {
+          totalOpM2Raw += (op.w * op.h * (op.count || 1)) / 1000000;
+        }
+      });
+
+      const topPieces = {};
+      const midPieces = {};
+      const botPieces = {};
+      let fullSheetsCount = 0;
+      let standalone7500Count = 0;
+
+      // 現場最適ルール（最長部優先・開口材最小化）を常時適用
+      for (let s = 0; s < totalSheets; s++) {
+        const xStart = s * Pitch;
+        const xEnd = Math.min((s + 1) * Pitch, W);
+
+        const insideOps = openingsData.filter(op => {
+          if (op.w <= 0 || op.h <= 0) return false;
+          const opLeft = op.x || 0;
+          const opRight = opLeft + op.w;
+          return xStart >= (opLeft - 1) && xEnd <= (opRight + 1);
+        });
+
+        if (insideOps.length === 0) {
+          fullSheetsCount++;
+        } else {
+          insideOps.sort((a, b) => a.y - b.y);
+
+          if (insideOps.length >= 2) {
+            const lowerOp = insideOps[0];
+            const upperOp = insideOps[1];
+
+            const topLen = Math.max(0, H - (upperOp.y + upperOp.h));
+            if (topLen > 0) topPieces[topLen] = (topPieces[topLen] || 0) + 1;
+
+            const midLen = Math.max(0, upperOp.y - (lowerOp.y + lowerOp.h));
+            if (midLen > 0) midPieces[midLen] = (midPieces[midLen] || 0) + 1;
+
+            const botLen = lowerOp.y;
+            if (botLen > 0) botPieces[botLen] = (botPieces[botLen] || 0) + 1;
+          } else {
+            const op = insideOps[0];
+            const botLen = op.y || 0;
+            const topLen = Math.max(0, H - ((op.y || 0) + op.h));
+
+            if (topLen === 7500 && botLen === 0) {
+              standalone7500Count++;
+              if (standalone7500Count % 2 === 1) {
+                topPieces[topLen] = (topPieces[topLen] || 0) + 1;
+              } else {
+                botPieces[topLen] = (botPieces[topLen] || 0) + 1;
+              }
+            } else {
+              if (topLen > 0) topPieces[topLen] = (topPieces[topLen] || 0) + 1;
+              if (botLen > 0) botPieces[botLen] = (botPieces[botLen] || 0) + 1;
+            }
+          }
         }
       }
-    }, { passive: true });
 
-    function selectField(field) {
-      state.activeField = field;
-      state.isOverwrite = true;
-      document.querySelectorAll('.input-box').forEach(el => el.classList.remove('active'));
-      const activeEl = document.getElementById(`box-${field}`);
-      if (activeEl) activeEl.classList.add('active');
-    }
+      // 結果表示
+      const formatPieces = (dict) => {
+        const entries = Object.entries(dict);
+        if (entries.length === 0) return '0枚';
+        return entries
+          .sort((a, b) => parseFloat(b[0]) - parseFloat(a[0]))
+          .map(([len, count]) => `L=${len}mm × ${count}枚`)
+          .join(', ');
+      };
 
-    function pressKey(key) {
-      const field = state.activeField;
+      document.getElementById('res-total-sheets').textContent = `${totalSheets.toLocaleString()} 枚`;
+      document.getElementById('res-full-info').textContent = `L=${H}mm × ${fullSheetsCount}枚`;
+      document.getElementById('res-top-info').textContent = formatPieces(topPieces);
+      document.getElementById('res-mid-info').textContent = formatPieces(midPieces);
+      document.getElementById('res-bot-info').textContent = formatPieces(botPieces);
 
-      if (state.isOverwrite) {
-        state.values[field] = (key === '.') ? '0.' : (key === '00' ? '0' : key);
-        state.isOverwrite = false;
-      } else {
-        let curr = state.values[field] || '';
-        if (curr === '0' && key !== '.') {
-          curr = '';
-        }
-        if (key === '.' && curr.includes('.')) {
-          return;
-        }
-        if (curr.length >= 8) return;
-        curr += key;
-        state.values[field] = curr;
-      }
+      const grossM2Raw = (W * H) / 1000000;
+      const netM2Raw = Math.max(0, grossM2Raw - totalOpM2Raw);
 
-      updateDisplay();
-      calculate();
-    }
-
-    function pressBack() {
-      state.isOverwrite = false;
-      const field = state.activeField;
-      let curr = state.values[field] || '';
-      if (curr.length > 1) {
-        curr = curr.slice(0, -1);
-      } else {
-        curr = '0';
-      }
-      state.values[field] = curr;
-      updateDisplay();
-      calculate();
-    }
-
-    function clearField() {
-      state.values[state.activeField] = '0';
-      state.isOverwrite = true;
-      updateDisplay();
-      calculate();
-    }
-
-    function updateDisplay() {
-      for (let k in state.values) {
-        const el = document.getElementById(`val-${k}`);
-        if (el) el.textContent = state.values[k];
-      }
+      document.getElementById('res-gross-area').innerHTML = `${ceilTo2(grossM2Raw)}<span class="text-xs text-zinc-400 font-normal ml-0.5">㎡</span>`;
+      document.getElementById('res-net-area').innerHTML = `${ceilTo2(netM2Raw)}<span class="text-xs text-zinc-400 font-normal ml-0.5">㎡</span>`;
+      document.getElementById('res-op-area').innerHTML = `${ceilTo2(totalOpM2Raw)}<span class="text-xs text-zinc-400 font-normal ml-0.5">㎡</span>`;
     }
 
     function ceilTo2(num) {
       if (isNaN(num) || num <= 0) return '0.00';
       const rounded = Math.round(num * 1000000) / 10000;
-      const ceiled = Math.ceil(rounded) / 100;
-      return ceiled.toFixed(2);
+      return (Math.ceil(rounded) / 100).toFixed(2);
     }
 
-    function calculate() {
-      const Pitch = parseFloat(state.values.pitch) || 0;
-      const OpCount = parseFloat(state.values.opCount) || 0;
-      const OpW = parseFloat(state.values.opW) || 0;
-      const OpH = parseFloat(state.values.opH) || 0;
-      const OpY = parseFloat(state.values.opY) || 0;
-      const W = parseFloat(state.values.wallW) || 0;
-      const H = parseFloat(state.values.wallH) || 0;
-
-      // 1. 面積計算（全て小数点第2位まで・切り上げ）
-      const grossM2Raw = (W * H) / 1000000;
-      const totalOpM2Raw = (OpW * OpH * OpCount) / 1000000;
-      const netM2Raw = Math.max(0, grossM2Raw - totalOpM2Raw);
-
-      const topLength = Math.max(0, H - (OpH + OpY));
-      const botLength = OpY;
-
-      const singleFullM2Raw = (Pitch * H) / 1000000;
-      const singleTopM2Raw = (Pitch * topLength) / 1000000;
-      const singleBotM2Raw = (Pitch * botLength) / 1000000;
-
-      const grossM2 = ceilTo2(grossM2Raw);
-      const totalOpM2 = ceilTo2(totalOpM2Raw);
-      const netM2 = ceilTo2(netM2Raw);
-      const singleFullM2 = ceilTo2(singleFullM2Raw);
-      const singleTopM2 = ceilTo2(singleTopM2Raw);
-      const singleBotM2 = ceilTo2(singleBotM2Raw);
-
-      // 面積表示反映
-      const grossEl = document.getElementById('area-gross');
-      const grossFormulaEl = document.getElementById('area-calc-formula');
-      const netEl = document.getElementById('area-net');
-      const opEl = document.getElementById('area-op');
-      const sFullEl = document.getElementById('area-single-full');
-      const sTopEl = document.getElementById('area-single-top');
-      const sBotEl = document.getElementById('area-single-bot');
-
-      if (grossEl) grossEl.innerHTML = `${grossM2}<span>㎡</span>`;
-      if (grossFormulaEl) grossFormulaEl.textContent = `W ${W} × H ${H}`;
-      if (netEl) netEl.innerHTML = `${netM2}<span>㎡</span>`;
-      if (opEl) opEl.innerHTML = `${totalOpM2}<span>㎡</span>`;
-      if (sFullEl) sFullEl.textContent = `${singleFullM2} ㎡ (L=${H}mm)`;
-      if (sTopEl) sTopEl.textContent = `${singleTopM2} ㎡ (L=${topLength}mm)`;
-      if (sBotEl) sBotEl.textContent = `${botLength > 0 ? singleBotM2 + ' ㎡ (L=' + botLength + 'mm)' : '0.00 ㎡ (なし)'}`;
-
-      // 2. 寸法割付計算
-      if (Pitch <= 0 || W <= 0) {
-        document.getElementById('disp-end-dim').innerHTML = `0<span>mm</span>`;
-        document.getElementById('disp-center-dim').innerHTML = `0<span>mm</span>`;
-        document.getElementById('res-total-sheets').textContent = '0 枚';
-        document.getElementById('res-full-info').textContent = `L=${H}mm × 0枚`;
-        document.getElementById('res-top-info').textContent = `L=0mm × 0枚`;
-        document.getElementById('res-bot-info').textContent = `L=0mm × 0枚`;
+    // ==========================================
+    // コピー＆画像保存機能
+    // ==========================================
+    function copyResults() {
+      const alertBox = document.getElementById('validation-alert');
+      if (alertBox && !alertBox.classList.contains('hidden')) {
+        showToast('入力内容に不備があるためコピーできません');
         return;
       }
+      const W = document.getElementById('input-wallW').value;
+      const H = document.getElementById('input-wallH').value;
+      const pitch = document.getElementById('input-pitch').value;
+      const total = document.getElementById('res-total-sheets').textContent;
+      const full = document.getElementById('res-full-info').textContent;
+      const top = document.getElementById('res-top-info').textContent;
+      const mid = document.getElementById('res-mid-info').textContent;
+      const bot = document.getElementById('res-bot-info').textContent;
+      const gross = document.getElementById('res-gross-area').textContent;
+      const net = document.getElementById('res-net-area').textContent;
 
-      // 片張余り・芯割余り
-      const mod = W % Pitch;
-      const endDim = (mod === 0) ? Pitch : Math.round(mod);
-      const centerDim = (mod === 0) ? Pitch : Math.round((mod + Pitch) / 2);
+      const text = `【図面材料計算結果】
+壁寸法: W ${W}mm × H ${H}mm (働幅: ${pitch}mm)
+総必要枚数: ${total}
+・最長部: ${full}
+・開口上: ${top}
+・開口間(中間): ${mid}
+・開口下: ${bot}
+面積:
+・全体面積: ${gross}
+・実外壁面積: ${net}`;
 
-      document.getElementById('disp-end-dim').innerHTML = `${endDim}<span>mm</span>`;
-      document.getElementById('disp-center-dim').innerHTML = `${centerDim}<span>mm</span>`;
-
-      // 数量計算（最長部切り上げ、開口切り下げ）
-      const totalSheets = Math.ceil(W / Pitch);
-      const opSheetsPerLoc = Math.floor(OpW / Pitch);
-      const totalOpSheets = (OpW > 0 && OpCount > 0) ? (opSheetsPerLoc * OpCount) : 0;
-      const fullSheets = Math.max(0, totalSheets - totalOpSheets);
-
-      document.getElementById('res-total-sheets').textContent = `${totalSheets.toLocaleString()} 枚`;
-      document.getElementById('res-full-info').textContent = `L=${H}mm × ${fullSheets}枚`;
-      document.getElementById('res-top-info').textContent = `L=${topLength}mm × ${totalOpSheets}枚`;
-      document.getElementById('res-bot-info').textContent = `L=${botLength}mm × ${OpY > 0 ? totalOpSheets : 0}枚`;
+      const tempTextArea = document.createElement("textarea");
+      tempTextArea.value = text;
+      document.body.appendChild(tempTextArea);
+      tempTextArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(tempTextArea);
+      showToast('計算結果をコピーしました');
     }
 
-    async function openSaveModal() {
-      let count = 1;
+    async function saveScreenshot() {
+      const btnText = document.getElementById('btn-screenshot-text');
+      btnText.textContent = '生成中...';
+      showToast('スクリーンショットを作成中...');
+
       try {
-        const db = dbInstance || await initDB();
-        const tx = db.transaction(STORE_NAME, 'readonly');
-        const store = tx.objectStore(STORE_NAME);
-        const req = store.count();
-        await new Promise((res) => {
-          req.onsuccess = () => {
-            count = (req.result || 0) + 1;
-            res();
-          };
-          req.onerror = () => res();
+        const viewCalc = document.getElementById('view-calc');
+        const viewDrawing = document.getElementById('view-drawing');
+        const wasCalcHidden = viewCalc.classList.contains('hidden');
+        const wasDrawingHidden = viewDrawing.classList.contains('hidden');
+
+        // スクリーンショット時は両方を結合表示
+        viewCalc.classList.remove('hidden');
+        viewDrawing.classList.remove('hidden');
+
+        const canvas = await html2canvas(document.body, {
+          backgroundColor: '#000000',
+          scale: 2.0,
+          useCORS: true,
+          ignoreElements: (el) => el.id === 'toast' || el.id === 'crop-modal' || el.id === 'api-modal' || el.id === 'image-modal' || el.tagName === 'NAV'
         });
-      } catch (e) {}
 
-      const defaultTitle = `No.${count} `;
-      const input = document.getElementById('save-title-input');
-      input.value = defaultTitle;
-      document.getElementById('save-modal').classList.add('show');
-      input.focus();
-    }
+        if (wasCalcHidden) viewCalc.classList.add('hidden');
+        if (wasDrawingHidden) viewDrawing.classList.add('hidden');
 
-    function closeSaveModal() {
-      document.getElementById('save-modal').classList.remove('show');
-    }
+        const blob = await new Promise(res => canvas.toBlob(res, 'image/png'));
+        const file = new File([blob], '材料計算結果.png', { type: 'image/png' });
 
-    async function confirmSave() {
-      const titleInput = document.getElementById('save-title-input');
-      const title = titleInput.value.trim() || 'No.未設定';
-
-      const dataRecord = {
-        title: title,
-        date: new Date().toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
-        mode: state.mode === 'area' ? '面積計算' : '寸法割付',
-        values: JSON.parse(JSON.stringify(state.values)),
-        results: {
-          total: document.getElementById('res-total-sheets').textContent,
-          full: document.getElementById('res-full-info').textContent,
-          top: document.getElementById('res-top-info').textContent,
-          bot: document.getElementById('res-bot-info').textContent,
-          endDim: document.getElementById('disp-end-dim').textContent,
-          centerDim: document.getElementById('disp-center-dim').textContent,
-          grossM2: document.getElementById('area-gross').textContent,
-          grossFormula: document.getElementById('area-calc-formula').textContent,
-          netM2: document.getElementById('area-net').textContent,
-          opM2: document.getElementById('area-op').textContent,
-          sFull: document.getElementById('area-single-full').textContent,
-          sTop: document.getElementById('area-single-top').textContent,
-          sBot: document.getElementById('area-single-bot').textContent
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({
+            files: [file],
+            title: '材料計算結果'
+          });
+          showToast('画像を共有しました');
+          return;
         }
-      };
 
-      try {
-        const db = dbInstance || await initDB();
-        const tx = db.transaction(STORE_NAME, 'readwrite');
-        tx.objectStore(STORE_NAME).add(dataRecord);
-        tx.oncomplete = () => {
-          closeSaveModal();
-          showToast(`「${title}」を保存しました`);
-          loadAreaHistoryList();
-        };
+        const url = URL.createObjectURL(blob);
+        openImageModal(url);
       } catch (err) {
         showToast('保存に失敗しました');
+      } finally {
+        btnText.textContent = '画面を画像保存';
       }
     }
 
-    async function loadAreaHistoryList() {
-      const listEl = document.getElementById('area-history-list');
-      if (!listEl) return;
-      listEl.innerHTML = '';
-
-      try {
-        const db = dbInstance || await initDB();
-        const tx = db.transaction(STORE_NAME, 'readonly');
-        const store = tx.objectStore(STORE_NAME);
-        const req = store.getAll();
-
-        req.onsuccess = () => {
-          const items = req.result || [];
-          if (items.length === 0) {
-            listEl.innerHTML = '<div style="color:var(--sub-text); text-align:center; padding: 14px 0; font-size:14px;">保存された面積データはありません</div>';
-            return;
-          }
-
-          items.reverse().forEach(item => {
-            const res = item.results || {};
-            const card = document.createElement('div');
-            card.className = 'area-hist-card';
-            card.innerHTML = `
-              <div style="display:flex; justify-content:space-between; align-items:center;">
-                <div style="font-weight:700; color:#fff; font-size:15px;">${escapeHtml(item.title)}</div>
-                <div style="font-size:14px; color:var(--sub-text);">${item.date}</div>
-              </div>
-              <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:4px; margin-top:4px; font-size:14px;">
-                <div style="color:#d4d4d8;">全体: <strong style="color:#fff;">${res.grossM2 || '―'}</strong></div>
-                <div style="color:#d4d4d8;">全体-開口: <strong style="color:var(--accent-blue);">${res.netM2 || '―'}</strong></div>
-                <div style="color:#d4d4d8;">開口合計: <strong style="color:var(--accent-green);">${res.opM2 || '―'}</strong></div>
-              </div>
-              <div style="font-size:14px; color:var(--sub-text); margin-top:2px;">
-                寸法(${res.grossFormula || '―'})
-              </div>
-              <div style="display:flex; flex-direction:column; gap:2px; font-size:14px; color:#d4d4d8; margin-top:4px; border-top:1px solid #27272a; padding-top:4px;">
-                <div>最長材(1枚): <strong style="color:#fff;">${res.sFull || '―'}</strong></div>
-                <div>開口上(1枚): <strong style="color:#fff;">${res.sTop || '―'}</strong></div>
-                ${res.sBot && !res.sBot.includes('なし') && !res.sBot.includes('0.000') ? `<div>開口下(1枚): <strong style="color:#fff;">${res.sBot}</strong></div>` : ''}
-              </div>
-            `;
-            listEl.appendChild(card);
-          });
-        };
-      } catch (e) {
-        listEl.innerHTML = '<div style="color:#f87171; text-align:center; padding: 10px; font-size:14px;">読み込みに失敗しました</div>';
-      }
+    function openImageModal(imgSrc) {
+      document.getElementById('screenshot-preview-img').src = imgSrc;
+      document.getElementById('btn-modal-download').href = imgSrc;
+      document.getElementById('image-modal').classList.remove('hidden');
     }
 
-    async function loadHistoryList() {
-      const listEl = document.getElementById('history-list');
-      listEl.innerHTML = '';
-
-      try {
-        const db = dbInstance || await initDB();
-        const tx = db.transaction(STORE_NAME, 'readonly');
-        const store = tx.objectStore(STORE_NAME);
-        const req = store.getAll();
-
-        req.onsuccess = () => {
-          const items = req.result || [];
-          if (items.length === 0) {
-            listEl.innerHTML = '<div style="color:var(--sub-text); text-align:center; padding: 30px 0; font-size:14px;">保存されたデータはありません</div>';
-            return;
-          }
-
-          items.reverse().forEach(item => {
-            const card = document.createElement('div');
-            card.className = 'history-card';
-            card.innerHTML = `
-              <div class="history-head">
-                <div class="history-title">${escapeHtml(item.title)}</div>
-                <div class="history-date">${item.date}</div>
-              </div>
-              <div class="history-body">
-                <div>総枚数: <strong style="color:var(--accent-blue); font-size:17px;">${item.results.total}</strong> (働幅: ${item.values.pitch}mm)</div>
-                <div>全体面積: ${item.results.grossM2 || '―'}</div>
-                <div>実面積: ${item.results.netM2 || '―'} / 開口: ${item.results.opM2 || '―'}</div>
-                <div>片張余り: ${item.results.endDim} / 芯割余り: ${item.results.centerDim}</div>
-                <div>最長部: ${item.results.full}</div>
-                ${item.results.top.includes('× 0枚') ? '' : `<div>開口上: ${item.results.top}</div>`}
-                ${item.results.bot.includes('× 0枚') ? '' : `<div>開口下: ${item.results.bot}</div>`}
-              </div>
-              <div class="history-actions">
-                <button class="hist-btn del" onclick="deleteHistory(${item.id})">削除</button>
-                <button class="hist-btn load" onclick="loadHistory(${item.id})">呼出</button>
-              </div>
-            `;
-            listEl.appendChild(card);
-          });
-        };
-      } catch (e) {
-        listEl.innerHTML = '<div style="color:#f87171; text-align:center; padding: 20px; font-size:14px;">読み込みに失敗しました</div>';
-      }
-    }
-
-    async function loadHistory(id) {
-      const db = dbInstance || await initDB();
-      const tx = db.transaction(STORE_NAME, 'readonly');
-      const req = tx.objectStore(STORE_NAME).get(id);
-      req.onsuccess = () => {
-        const item = req.result;
-        if (item) {
-          state.values = JSON.parse(JSON.stringify(item.values));
-          state.isOverwrite = true;
-          updateDisplay();
-          setMode('dim');
-          showToast(`「${item.title}」を呼び出しました`);
-        }
-      };
-    }
-
-    async function deleteHistory(id) {
-      const db = dbInstance || await initDB();
-      const tx = db.transaction(STORE_NAME, 'readwrite');
-      tx.objectStore(STORE_NAME).delete(id);
-      tx.oncomplete = () => {
-        loadHistoryList();
-        showToast('削除しました');
-      };
+    function closeImageModal() {
+      document.getElementById('image-modal').classList.add('hidden');
     }
 
     function showToast(msg) {
       const toast = document.getElementById('toast');
       toast.textContent = msg;
       toast.style.opacity = '1';
-      setTimeout(() => {
-        toast.style.opacity = '0';
-      }, 1600);
+      clearTimeout(window._toastTimer);
+      window._toastTimer = setTimeout(() => { toast.style.opacity = '0'; }, 3000);
     }
 
     function escapeHtml(str) {
-      return str.replace(/[&<>'"]/g, tag => ({
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        "'": '&#39;',
-        '"': '&quot;'
-      }[tag] || tag));
+      return (str || '').replace(/[&<>'"]/g, t => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[t] || t));
     }
 
     window.addEventListener('DOMContentLoaded', () => {
-      initDB();
-      updateDisplay();
+      renderOpenings();
       calculate();
+      updateApiKeyUI();
+      // アプリ起動時のデフォルト画面を「計算結果（手動入力画面）」に固定
+      switchTab('calc');
     });
+
+    // PWA Service Worker Registration
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+          .then((reg) => console.log('Service Worker registered.', reg.scope))
+          .catch((err) => console.error('Service Worker registration failed:', err));
+      });
+    }
   </script>
 </body>
 </html>
