@@ -232,6 +232,15 @@
             </div>
           </div>
         </div>
+        <div class="flex flex-wrap items-center gap-2 bg-black/40 border border-zinc-800 rounded-xl px-2.5 py-2 text-xs">
+          <label for="input-layout-direction" class="text-zinc-300 font-semibold">割付開始</label>
+          <select id="input-layout-direction" onchange="calculate()" class="min-h-9 bg-zinc-900 border border-zinc-700 rounded-lg px-2 text-white text-sm">
+            <option value="left">左端から割付</option>
+            <option value="right">右端から割付</option>
+            <option value="center">芯割（両端均等）</option>
+          </select>
+          <span class="text-zinc-400">開口のXは壁左端からの距離</span>
+        </div>
       </div>
 
       <!-- 3. 開口部リストカード（途切れ・見切れを根絶した2段構造） -->
@@ -250,8 +259,12 @@
       <!-- 4. 材料取り結果カード -->
       <div class="bg-zinc-900 border border-orange-500/80 rounded-xl p-3 flex flex-col gap-2 flex-none shadow">
         <div class="flex justify-between items-center pb-2 border-b border-zinc-800">
-          <span class="text-sm font-bold text-zinc-200">【結果】総必要枚数</span>
+          <span class="text-sm font-bold text-zinc-200">【結果】必要材料合計</span>
           <span class="font-extrabold text-sky-400 font-mono text-2xl" id="res-total-sheets">0 枚</span>
+        </div>
+        <div class="flex justify-between items-center py-0.5 text-xs text-zinc-400">
+          <span>横方向の割付</span>
+          <span id="res-layout-columns" class="font-mono text-right">0 列</span>
         </div>
         <div class="flex justify-between items-center py-0.5">
           <span class="text-xs font-medium text-zinc-400">最長部</span>
@@ -922,6 +935,7 @@
         errorList.innerHTML = validationErrors.map(err => `<li>${escapeHtml(err)}</li>`).join('');
         alertBox.classList.remove('hidden');
         document.getElementById('res-total-sheets').textContent = '入力エラー';
+        document.getElementById('res-layout-columns').textContent = '入力エラー';
         document.getElementById('res-full-info').textContent = '---';
         document.getElementById('res-top-info').textContent = '---';
         document.getElementById('res-mid-info').textContent = '---';
@@ -934,7 +948,24 @@
 
       alertBox.classList.add('hidden');
 
+      const layoutDirection = document.getElementById('input-layout-direction').value;
+      const layoutOpenings = layoutDirection === 'right'
+        ? openingsData.map(op => ({ ...op, x: W - (op.x || 0) - op.w }))
+        : openingsData;
+
+      const mod = W % Pitch;
+      const centerDim = (mod === 0) ? Pitch : Math.round((mod + Pitch) / 2);
       const totalSheets = Math.ceil(W / Pitch);
+      const getSheetRange = (s) => {
+        if (layoutDirection !== 'center' || totalSheets === 1) {
+          const xStart = s * Pitch;
+          const xEnd = Math.min((s + 1) * Pitch, W);
+          return [xStart, xEnd];
+        }
+        if (s === 0) return [0, centerDim];
+        if (s === totalSheets - 1) return [W - centerDim, W];
+        return [centerDim + (s - 1) * Pitch, centerDim + s * Pitch];
+      };
       let totalOpM2Raw = 0;
       openingsData.forEach(op => {
         if (op.w > 0 && op.h > 0) {
@@ -950,10 +981,9 @@
 
       // 現場最適ルール（最長部優先・開口材最小化）を常時適用
       for (let s = 0; s < totalSheets; s++) {
-        const xStart = s * Pitch;
-        const xEnd = Math.min((s + 1) * Pitch, W);
+        const [xStart, xEnd] = getSheetRange(s);
 
-        const insideOps = openingsData.filter(op => {
+        const insideOps = layoutOpenings.filter(op => {
           if (op.w <= 0 || op.h <= 0) return false;
           const opLeft = op.x || 0;
           const opRight = opLeft + op.w;
@@ -1007,7 +1037,13 @@
           .join(', ');
       };
 
-      document.getElementById('res-total-sheets').textContent = `${totalSheets.toLocaleString()} 枚`;
+      let materialCount = fullSheetsCount;
+      for (const pieces of [topPieces, midPieces, botPieces]) {
+        for (const count of Object.values(pieces)) materialCount += count;
+      }
+      document.getElementById('res-total-sheets').textContent = `${materialCount.toLocaleString()} 枚`;
+      const directionLabel = layoutDirection === 'right' ? '右端から' : layoutDirection === 'center' ? `芯割・両端${centerDim.toLocaleString()}mmずつ` : '左端から';
+      document.getElementById('res-layout-columns').textContent = `${totalSheets.toLocaleString()} 列（${directionLabel}）`;
       document.getElementById('res-full-info').textContent = `L=${H}mm × ${fullSheetsCount}枚`;
       document.getElementById('res-top-info').textContent = formatPieces(topPieces);
       document.getElementById('res-mid-info').textContent = formatPieces(midPieces);
@@ -1040,6 +1076,7 @@
       const H = document.getElementById('input-wallH').value;
       const pitch = document.getElementById('input-pitch').value;
       const total = document.getElementById('res-total-sheets').textContent;
+      const layout = document.getElementById('res-layout-columns').textContent;
       const full = document.getElementById('res-full-info').textContent;
       const top = document.getElementById('res-top-info').textContent;
       const mid = document.getElementById('res-mid-info').textContent;
@@ -1049,7 +1086,8 @@
 
       const text = `【図面材料計算結果】
 壁寸法: W ${W}mm × H ${H}mm (働幅: ${pitch}mm)
-総必要枚数: ${total}
+必要材料合計: ${total}
+横方向の割付: ${layout}
 ・最長部: ${full}
 ・開口上: ${top}
 ・開口間(中間): ${mid}
